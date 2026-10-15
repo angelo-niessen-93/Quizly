@@ -56,7 +56,7 @@ class QuizTests(APITestCase):
 
     def test_owner_is_always_request_user(self):
         """Client owner fields cannot assign quizzes to another account."""
-        data = {**quiz_content(), 'youtube_url': URL, 'owner': 999}
+        data = {**quiz_content(), 'url': URL, 'owner': 999}
         response = self.client.post('/api/quizzes/', data, format='json')
         self.assertEqual(response.status_code, 201)
         quiz = Quiz.objects.get(pk=response.data['id'])
@@ -67,7 +67,7 @@ class QuizTests(APITestCase):
         )
 
     def test_other_user_cannot_access_or_modify(self):
-        """Foreign detail, progress and replay routes all return 404."""
+        """Foreign detail, progress and replay routes all return 403."""
         other = get_user_model().objects.create_user(
             username='other', email='other@example.com'
         )
@@ -80,14 +80,14 @@ class QuizTests(APITestCase):
         data = {
             'title': 'Edited',
             'description': 'New',
-            'youtube_url': 'https://evil.example/',
+            'url': 'https://evil.example/',
         }
         response = self.client.patch(self.detail, data, format='json')
         self.assertEqual(response.status_code, 200)
         self.quiz.refresh_from_db()
         self.assertEqual(self.quiz.title, 'Edited')
         self.assertEqual(self.quiz.description, 'New')
-        self.assertEqual(self.quiz.youtube_url, URL)
+        self.assertEqual(self.quiz.video_url, URL)
         self.assertEqual(self.quiz.owner, self.user)
 
     def test_invalid_question_count(self):
@@ -96,7 +96,7 @@ class QuizTests(APITestCase):
             data = quiz_content()
             data['questions'] = (data['questions'] * 2)[:count]
             response = self.client.post(
-                '/api/quizzes/', {**data, 'youtube_url': URL}, format='json'
+                '/api/quizzes/', {**data, 'url': URL}, format='json'
             )
             self.assertEqual(response.status_code, 400)
         self.assertEqual(Quiz.objects.count(), 1)
@@ -107,18 +107,18 @@ class QuizTests(APITestCase):
             data = quiz_content()
             make_invalid_answers(data['questions'][0]['answers'], mode)
             response = self.client.post(
-                '/api/quizzes/', {**data, 'youtube_url': URL}, format='json'
+                '/api/quizzes/', {**data, 'url': URL}, format='json'
             )
             self.assertEqual(response.status_code, 400)
 
     def test_solutions_are_hidden_until_complete(self):
         """Neither correctness flags nor correct answer IDs leak initially."""
-        response = self.client.get(self.detail)
+        response = self.client.get(self.detail + 'progress/')
         for question in response.data['questions']:
             self.assertIsNone(question['correct_answer'])
             for answer in question['answers']:
                 self.assertNotIn('is_correct', answer)
-        self.assertIsNone(response.data['progress']['score'])
+        self.assertIsNone(response.data['score'])
 
     def test_progress_is_saved_and_answer_replaceable(self):
         """Replacing an answer updates one persisted selection."""
@@ -138,9 +138,9 @@ class QuizTests(APITestCase):
         """Completion yields a percentage and correct answer IDs."""
         self.complete_quiz()
         self.select(self.quiz.questions.first(), False)
-        response = self.client.get(self.detail)
-        self.assertTrue(response.data['progress']['completed'])
-        self.assertEqual(response.data['progress']['score'], 90)
+        response = self.client.get(self.detail + 'progress/')
+        self.assertTrue(response.data['completed'])
+        self.assertEqual(response.data['score'], 90)
         for question in response.data['questions']:
             self.assertIsNotNone(question['correct_answer'])
 
@@ -162,7 +162,7 @@ class QuizTests(APITestCase):
         self.assertEqual(response.data['attempt'], 2)
         self.assertEqual(response.data['selections'], [])
         self.assertFalse(response.data['completed'])
-        detail = self.client.get(self.detail)
+        detail = self.client.get(self.detail + 'progress/')
         self.assertIsNone(detail.data['questions'][0]['correct_answer'])
 
     def test_delete_cascades(self):
@@ -218,7 +218,7 @@ class QuizTests(APITestCase):
                 response = getattr(self.client, method)(
                     self.detail + suffix, {}
                 )
-                self.assertEqual(response.status_code, 404)
+                self.assertEqual(response.status_code, 403)
 
 
 def question_content(index):

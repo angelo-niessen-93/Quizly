@@ -11,6 +11,11 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
+LOGOUT_DETAIL = (
+    'Log-Out successfully! All Tokens will be deleted. '
+    'Refresh token is now invalid.'
+)
+
 
 def save_registration(serializer):
     """Translate concurrent uniqueness conflicts into a safe API error."""
@@ -34,12 +39,12 @@ def set_token_cookie(response, name, token, lifetime):
     )
 
 
-def session_response(user):
+def session_response(user, payload=None):
     """Create a session whose access token tracks its refresh token."""
     refresh = RefreshToken.for_user(user)
     access = refresh.access_token
     access['session_jti'] = refresh['jti']
-    response = Response({'user': user_identity(user)})
+    response = Response(payload or login_payload(user))
     set_token_cookie(response, 'access_token', access, access.lifetime)
     set_token_cookie(response, 'refresh_token', refresh, refresh.lifetime)
     return response
@@ -64,7 +69,7 @@ def rotate_session(request):
     )
     if user is None:
         raise AuthenticationFailed('Session expired. Please log in again.')
-    return session_response(user)
+    return session_response(user, {'detail': 'Token refreshed'})
 
 
 @transaction.atomic
@@ -75,15 +80,22 @@ def revoke_session(request):
             consume_refresh(request)
         except AuthenticationFailed:
             pass
-    response = Response({'detail': 'Logged out.'})
+    response = Response({'detail': LOGOUT_DETAIL})
     for name in ('access_token', 'refresh_token'):
         set_token_cookie(response, name, '', timedelta(0))
     return response
 
 
-def user_identity(user):
-    """Expose only public identity fields in the session response."""
-    return {'id': user.pk, 'username': user.username, 'email': user.email}
+def login_payload(user):
+    """Return the documented login message and public identity fields."""
+    return {
+        'detail': 'Login successfully!',
+        'user': {
+            'id': user.pk,
+            'username': user.username,
+            'email': user.email,
+        },
+    }
 
 
 def consume_refresh(request):

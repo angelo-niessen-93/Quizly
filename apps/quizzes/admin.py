@@ -70,7 +70,7 @@ class QuizAdmin(admin.ModelAdmin):
     list_display = ['title', 'owner', 'created_at']
     search_fields = ['title', 'owner__username']
     list_filter = ['created_at']
-    readonly_fields = ['owner', 'youtube_url', 'created_at']
+    readonly_fields = ['owner', 'video_url', 'created_at', 'updated_at']
     inlines = [QuestionInline]
 
     def has_add_permission(self, request):
@@ -83,7 +83,7 @@ class QuestionAdmin(admin.ModelAdmin):
     list_display = ['question', 'quiz', 'position']
     list_filter = ['quiz']
     search_fields = ['question', 'quiz__title']
-    readonly_fields = ['quiz', 'position']
+    readonly_fields = ['quiz', 'position', 'created_at', 'updated_at']
     inlines = [AnswerInline]
 
     def has_add_permission(self, request):

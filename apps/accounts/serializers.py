@@ -4,6 +4,7 @@ from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
 
 User = get_user_model()
 
@@ -55,5 +56,5 @@ class LoginSerializer(serializers.Serializer):
         """Use one generic error for unknown users and wrong passwords."""
         user = authenticate(request=self.context['request'], **attrs)
         if user is None:
-            raise serializers.ValidationError('Invalid username or password.')
+            raise AuthenticationFailed('Invalid username or password.')
         return {'user': user}

@@ -12,8 +12,9 @@ class Quiz(models.Model):
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, max_length=5000)
-    youtube_url = models.URLField(max_length=200)
+    video_url = models.URLField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at', '-pk']
@@ -29,6 +30,8 @@ class Question(models.Model):
     )
     question = models.CharField(max_length=1000)
     position = models.PositiveSmallIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['position']

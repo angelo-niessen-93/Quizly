@@ -6,6 +6,7 @@ from rest_framework.decorators import (
     authentication_classes,
     permission_classes,
 )
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
@@ -35,7 +36,7 @@ def register(request):
     serializer = RegisterSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     save_registration(serializer)
-    return Response(serializer.data, status=201)
+    return Response({'detail': 'User created successfully!'}, status=201)
 
 
 @api_view(['POST'])
@@ -46,7 +47,8 @@ def login(request):
     serializer = LoginSerializer(
         data=request.data, context={'request': request}
     )
-    serializer.is_valid(raise_exception=True)
+    if not serializer.is_valid():
+        raise AuthenticationFailed('Invalid username or password.')
     rotate_token(request)
     return session_response(serializer.validated_data['user'])
 

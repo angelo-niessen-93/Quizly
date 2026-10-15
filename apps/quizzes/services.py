@@ -21,11 +21,11 @@ def filter_period(queryset, period):
 
 
 @transaction.atomic
-def save_quiz(owner, youtube_url, content):
+def save_quiz(owner, video_url, content):
     """Persist a validated quiz and initial progress as a single unit."""
     content = content.copy()
     questions = content.pop('questions')
-    quiz = Quiz.objects.create(owner=owner, youtube_url=youtube_url, **content)
+    quiz = Quiz.objects.create(owner=owner, video_url=video_url, **content)
     for position, item in enumerate(questions, 1):
         save_question(quiz, position, item)
     Progress.objects.create(quiz=quiz)

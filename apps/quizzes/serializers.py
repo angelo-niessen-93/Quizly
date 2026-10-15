@@ -1,4 +1,4 @@
-"""Validate content and expose solutions only after completing an attempt."""
+"""Documented quiz responses and separate saved-game representations."""
 
 from rest_framework import serializers
 
@@ -43,7 +43,7 @@ class QuizContentSerializer(serializers.Serializer):
 
 
 class QuizCreateSerializer(serializers.Serializer):
-    youtube_url = serializers.CharField(max_length=200)
+    url = serializers.CharField(source='video_url', max_length=200)
     title = serializers.CharField(max_length=200, required=False)
     description = serializers.CharField(
         max_length=5000, required=False, allow_blank=True
@@ -52,7 +52,7 @@ class QuizCreateSerializer(serializers.Serializer):
         many=True, min_length=10, max_length=10, required=False
     )
 
-    def validate_youtube_url(self, value):
+    def validate_url(self, value):
         """Reject non-YouTube URLs before network processing."""
         return validate_youtube_url(value)
 
@@ -82,7 +82,7 @@ class AnswerSerializer(serializers.ModelSerializer):
         fields = ['id', 'text']
 
 
-class QuestionSerializer(serializers.ModelSerializer):
+class PlayQuestionSerializer(serializers.ModelSerializer):
     answers = AnswerSerializer(many=True, read_only=True)
     correct_answer = serializers.SerializerMethodField()
 
@@ -99,6 +99,29 @@ class QuestionSerializer(serializers.ModelSerializer):
         return None
 
 
+class QuestionSerializer(serializers.ModelSerializer):
+    question_title = serializers.CharField(source='question', read_only=True)
+    question_options = serializers.SlugRelatedField(
+        source='answers', slug_field='text', many=True, read_only=True
+    )
+    answer = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Question
+        fields = [
+            'id',
+            'question_title',
+            'question_options',
+            'answer',
+            'created_at',
+            'updated_at',
+        ]
+
+    def get_answer(self, question):
+        """Return the correct answer text required by the quiz contract."""
+        return next(a.text for a in question.answers.all() if a.is_correct)
+
+
 class SelectedAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = SelectedAnswer
@@ -108,10 +131,20 @@ class SelectedAnswerSerializer(serializers.ModelSerializer):
 class ProgressSerializer(serializers.ModelSerializer):
     selections = SelectedAnswerSerializer(many=True, read_only=True)
     score = serializers.SerializerMethodField()
+    questions = PlayQuestionSerializer(
+        source='quiz.questions', many=True, read_only=True
+    )
 
     class Meta:
         model = Progress
-        fields = ['attempt', 'completed', 'updated_at', 'selections', 'score']
+        fields = [
+            'attempt',
+            'completed',
+            'updated_at',
+            'selections',
+            'score',
+            'questions',
+        ]
 
     def get_score(self, progress):
         """Return the percentage of correct answers after completion."""
@@ -123,7 +156,6 @@ class ProgressSerializer(serializers.ModelSerializer):
 
 class QuizSerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
-    progress = ProgressSerializer(read_only=True)
 
     class Meta:
         model = Quiz
@@ -131,10 +163,10 @@ class QuizSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'description',
-            'youtube_url',
             'created_at',
+            'updated_at',
+            'video_url',
             'questions',
-            'progress',
         ]
 
 

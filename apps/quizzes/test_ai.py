@@ -198,7 +198,7 @@ class GenerationAPITests(APITestCase):
     def test_generated_quiz_is_persisted(self):
         """Generation saves ten questions and ten correct solutions."""
         with patch.object(ai, 'generate_content', return_value=quiz_content()):
-            response = self.client.post('/api/quizzes/', {'youtube_url': URL})
+            response = self.client.post('/api/quizzes/', {'url': URL})
         self.assertEqual(response.status_code, 201)
         quiz = Quiz.objects.get()
         self.assertEqual(quiz.questions.count(), 10)
@@ -214,7 +214,7 @@ class GenerationAPITests(APITestCase):
         """URL validation happens before the external pipeline."""
         with patch.object(ai, 'generate_content') as generate:
             response = self.client.post(
-                '/api/quizzes/', {'youtube_url': 'https://evil.example/video'}
+                '/api/quizzes/', {'url': 'https://evil.example/video'}
             )
         self.assertEqual(response.status_code, 400)
         generate.assert_not_called()
@@ -223,7 +223,7 @@ class GenerationAPITests(APITestCase):
     @override_settings(OPENAI_API_KEY='', GEMINI_API_KEY='')
     def test_missing_credentials_returns_safe_503(self):
         """Missing keys return a clear failure and leave no partial quiz."""
-        response = self.client.post('/api/quizzes/', {'youtube_url': URL})
+        response = self.client.post('/api/quizzes/', {'url': URL})
         self.assertEqual(response.status_code, 503)
         self.assertFalse(Quiz.objects.exists())
 
@@ -232,7 +232,7 @@ class GenerationAPITests(APITestCase):
         with patch.object(
             ai, 'generate_content', side_effect=ai.GenerationFailed
         ):
-            response = self.client.post('/api/quizzes/', {'youtube_url': URL})
+            response = self.client.post('/api/quizzes/', {'url': URL})
         self.assertEqual(response.status_code, 502)
         self.assertFalse(Quiz.objects.exists())
 
@@ -245,7 +245,7 @@ class GenerationAPITests(APITestCase):
             with self.assertRaises(RuntimeError):
                 self.client.post(
                     '/api/quizzes/',
-                    {**quiz_content(), 'youtube_url': URL},
+                    {**quiz_content(), 'url': URL},
                     format='json',
                 )
         self.assertFalse(Quiz.objects.exists())

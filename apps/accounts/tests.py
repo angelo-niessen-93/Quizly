@@ -79,7 +79,7 @@ class AuthenticationTests(APITestCase):
         """Both tokens are secure HTTP-only cookies absent from JSON."""
         response = self.sign_in()
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(set(response.data), {'user'})
+        self.assertEqual(set(response.data), {'detail', 'user'})
         for name in ('access_token', 'refresh_token'):
             cookie = response.cookies[name]
             self.assertTrue(cookie['httponly'])
@@ -95,14 +95,14 @@ class AuthenticationTests(APITestCase):
             )
             for name in ('bob', 'unknown')
         ]
-        self.assertEqual(responses[0].status_code, 400)
+        self.assertEqual(responses[0].status_code, 401)
         self.assertEqual(responses[0].data, responses[1].data)
 
     def test_inactive_user_cannot_login(self):
         """Disabled accounts cannot obtain a session."""
         self.user.is_active = False
         self.user.save()
-        self.assertEqual(self.sign_in().status_code, 400)
+        self.assertEqual(self.sign_in().status_code, 401)
 
     def test_refresh_rotates_and_blacklists(self):
         """An old refresh token is unusable after rotation."""

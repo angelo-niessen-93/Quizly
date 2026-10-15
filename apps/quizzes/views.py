@@ -1,9 +1,11 @@
 """Owner-scoped CRUD and automatically saved quiz play."""
 
 from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Quiz
+from .permissions import IsQuizOwner
 from .serializers import (
     ProgressSerializer,
     QuizCreateSerializer,
@@ -16,11 +18,12 @@ from .services import filter_period, replay_quiz, save_selection
 
 class OwnedQuizMixin:
     serializer_class = QuizSerializer
+    permission_classes = [IsAuthenticated, IsQuizOwner]
 
     def get_queryset(self):
-        """Scope every lookup to the authenticated owner."""
+        """Load quizzes before applying the ownership object permission."""
         return (
-            Quiz.objects.filter(owner=self.request.user)
+            Quiz.objects.all()
             .select_related('progress')
             .prefetch_related(
                 'questions__answers', 'progress__selections__answer'
@@ -32,7 +35,8 @@ class QuizListCreateView(OwnedQuizMixin, generics.ListCreateAPIView):
     def get_queryset(self):
         """Filter owned quizzes by an optional local calendar period."""
         return filter_period(
-            super().get_queryset(), self.request.query_params.get('period')
+            super().get_queryset().filter(owner=self.request.user),
+            self.request.query_params.get('period'),
         )
 
     def create(self, request, *args, **kwargs):

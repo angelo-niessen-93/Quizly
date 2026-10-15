@@ -28,7 +28,6 @@ class CsrfOnlyAuthentication(BaseAuthentication):
 class CookieJWTAuthentication(JWTAuthentication):
     def authenticate(self, request):
         """Read cookies and reject access tokens of revoked sessions."""
-        enforce_csrf(request)
         raw_token = request.COOKIES.get('access_token')
         if not raw_token:
             return None
@@ -37,4 +36,5 @@ class CookieJWTAuthentication(JWTAuthentication):
             token__jti=token.get('session_jti', '')
         ).exists():
             raise AuthenticationFailed('Session expired. Please log in again.')
+        enforce_csrf(request)
         return self.get_user(token), token
