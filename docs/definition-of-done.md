@@ -26,19 +26,19 @@ Integrationen, deren echter Dienstaufruf noch nicht geprüft werden konnte.
 | Titel und Beschreibung bearbeiten | Erledigt | PATCH und Admin |
 | YouTube-URL speichern | Erledigt | Validierte kanonische URL im Quiz |
 | Zehn Fragen mit jeweils vier Antworten | Erledigt | Serializer, KI-Schema, Admin-Schutz und DB-Positionsgrenzen |
-| Fortschritt automatisch speichern | Erledigt | Atomare Speicherung bei jeder Auswahl |
-| Antworten nachträglich ändern | Erledigt | Auswahl wird ersetzt; Bewertung aktualisiert |
+| Fortschritt automatisch speichern | Erledigt | Atomare Speicherung nach jedem Klick; Frontend und SQLite im Browser geprüft |
+| Antworten nachträglich ändern | Erledigt | Gespeicherte Auswahl wird ersetzt; Reload und Bewertung bis nach Abschluss geprüft |
 | Prozentwertung und korrekte Lösungen | Erledigt | Prozentwertung nach Abschluss; korrekter Antworttext im Quiz-Response gemäß API-Vertrag stets vorhanden |
-| Quiz erneut spielen | Erledigt | Replay setzt Fortschritt zurück und erhöht Versuchszähler |
+| Quiz erneut spielen | Erledigt | Frontend ruft Replay auf; Datenbank und Reload bestätigen zurückgesetzte Auswahl und Versuchszähler |
 
 ## 3. KI-Integration
 
 | Anforderung | Status | Nachweis / verbleibende Prüfung |
 | --- | --- | --- |
 | Nur gültige YouTube-URLs | Erledigt | HTTPS-/Host-/Video-ID-Validierung vor Netzwerkzugriff; tatsächliche Verfügbarkeit erst beim Download |
-| Audio mit yt-dlp und FFmpeg verarbeiten | Teilweise erledigt | Implementiert; lokales FFmpeg/FFprobe fehlt, echter Download-/Konvertierungstest offen |
-| Transkription mit OpenAI Whisper | Teilweise erledigt | whisper-1 angebunden, SDK-Aufruf simuliert getestet; eigener API-Key und echter Aufruf fehlen |
-| Quizgenerierung mit Gemini Flash | Teilweise erledigt | Konfigurierbares Flash-Modell angebunden, Schema und SDK-Aufruf getestet; eigener Key/Modellzugriff und echter Aufruf fehlen |
+| Audio mit yt-dlp und FFmpeg verarbeiten | Erledigt | Echter Download, MP3-Konvertierung und FFprobe-Prüfung erfolgreich |
+| Transkription mit OpenAI Whisper | Erledigt | openai-whisper lokal, small auf RTX 5070 Ti, zwei lokale Aufrufe und echtes YouTube-Audio geprüft |
+| Quizgenerierung mit Gemini Flash | Teilweise erledigt | Konfigurierbares Flash-Modell angebunden, Schema und SDK-Aufruf getestet; Key wird geladen; Modellzugriff und echter Aufruf warten auf Kostenfreigabe |
 | KI-Antworten validieren, Fragen und Lösungen speichern | Erledigt | JSON-/Inhaltsvalidierung, atomare Speicherung, Rollback-Tests |
 | Temporäre Dateien zuverlässig entfernen | Erledigt | Erfolgs-, Transkriptions- und Downloadfehler getestet |
 | API-Keys über Umgebungsvariablen | Erledigt | .env.example ohne Secrets; sichere 503 bei fehlender Einrichtung |
@@ -68,27 +68,24 @@ Integrationen, deren echter Dienstaufruf noch nicht geprüft werden konnte.
 
 ## Noch erforderliche externe Abnahme
 
-- **Offen:** Eigene gültige OpenAI-/Gemini-Zugangsdaten einrichten.
-- **Offen:** FFmpeg/FFprobe installieren und echten End-to-End-Durchlauf mit
-  einem verfügbaren YouTube-Video durchführen.
-- **Offen:** Tatsächliches Frontend anbinden und Browserablauf einschließlich
-  CORS, Cookies und CSRF in der Zielumgebung prüfen; Frontend fehlt im Repository.
-- **Offen:** Vor Veröffentlichung Zielhost, HTTPS, produktive Secrets und
-  Deployment-Konfiguration setzen und dort den Deployment-Check ausführen.
+- **Offen:** Kostenfreigabe für echten Gemini-Aufruf und anschließende Prüfung
+  der Key-/Modellberechtigung sowie der vollständigen Quizgenerierung.
+- **Offen:** Zielhosting, HTTPS und produktive Betriebskonfiguration abnehmen.
 
-Es wurden keine externen Zugangsdaten erfunden, keine kostenpflichtigen
-KI-Aufrufe ausgeführt und keine Änderungen nach GitHub übertragen.
+FFmpeg/FFprobe, lokales Whisper und die Fortschrittssynchronisierung zwischen
+Frontend und Backend sind jetzt tatsächlich geprüft. Beide Repositories bleiben
+getrennt. Keine kostenpflichtigen APIs, Commits oder Pushes wurden ausgeführt.
 
 ## Lokale Abschlussprüfung
 
-- 83 automatisierte Tests erfolgreich.
+- 91 automatisierte Backend-Tests erfolgreich.
 - Ruff-Lint und Formatprüfung erfolgreich.
 - Alle Projektfunktionen erfüllen 14-Zeilen-Grenze, snake_case und Docstrings.
 - Migrationen angewendet; keine fehlenden Modellmigrationen.
 - Abhängigkeiten konsistent; git diff --check ohne Fehler.
 - Django check --deploy mit DEBUG=false, Secure-Cookies und HTTPS-Weiterleitung
   ohne Warnungen. Dies ersetzt die Prüfung im tatsächlichen Hosting nicht.
-- Lokale .env mit neu erzeugtem Django-Schlüssel erstellt; API-Keys bleiben leer.
+- Lokale .env mit neu erzeugtem Django-Schlüssel erstellt; Gemini-Key wird geladen; Whisper benötigt keinen API-Key.
   .env, SQLite-Datenbank und virtuelle Umgebung werden von Git ausgeschlossen.
 
 ## Abgleich mit dem vorgegebenen API-Vertrag
@@ -133,7 +130,32 @@ Ein Migrationstest prüft den Erhalt aller zehn Fragen, ihrer Antwortmöglichkei
 des Versuchszählers und der gespeicherten Auswahlen. Zeitstempel bisheriger
 Einträge werden beim Migrieren initialisiert.
 
-Abschluss: 83 Tests erfolgreich, darunter 29 zusätzliche Vertrags-, Browser-
-und Migrationstests. Ruff, Formatierung, Funktionsregeln, Migrationsstand,
-Abhängigkeiten und Deployment-Check mit Produktionseinstellungen sind geprüft.
-Die externe KI-, Frontend- und Hosting-Abnahme bleibt wie oben beschrieben offen.
+Abschluss: 91 Backend-Tests und neun Frontend-Tests erfolgreich.
+Der Vertragstestbestand bleibt erhalten. Die echte Gemini- und Hosting-Abnahme
+bleibt offen; alle aktuellen Nachweise stehen im Integrationsbericht.
+
+
+## Aktuelle lokale Integrationsprüfung
+
+Vollständiger Nachweis:
+[local-integration-check.md](local-integration-check.md).
+
+- **Erfolgreich:** FFmpeg/FFprobe 9.0.2 installiert, als Windows-Befehle sowie
+  über FFMPEG_LOCATION erreichbar.
+- **Erfolgreich:** Lokales openai-whisper, Modell small, PyTorch 2.14.1+cu130,
+  echte CUDA-Berechnung und Transkription auf RTX 5070 Ti.
+- **Erfolgreich:** Einmaliges Laden pro Prozess, Lock und Wiederverwendung;
+  Cache-Hit beim zweiten echten lokalen Aufruf nachgewiesen.
+- **Erfolgreich:** YouTube-Audio geladen, konvertiert, lokal transkribiert und
+  temporäre Dateien entfernt; kein OpenAI-API-Key erforderlich.
+- **Erfolgreich:** Vorhandener GEMINI_API_KEY unverändert erkannt und Server
+  neu gestartet; keine geheimen Werte ausgegeben.
+- **Erfolgreich:** Browser-/SQLite-Prüfung für Autosave ohne Weiter-Klick,
+  Neuladen, Antwortänderungen, abgeschlossene Bewertung 90 % -> 100 %,
+  serverseitigen Replay, Fehlerspeicherung und anschließenden Retry.
+- **Erfolgreich:** 91 Backend-Tests sowie neun Frontend-Tests.
+- **Offen:** Echter Gemini-Aufruf und gesamter End-to-End-Durchlauf bis zum
+  tatsächlich von Gemini erzeugten Quiz; Kostenfreigabe fehlt.
+
+Die lokalen Integrationsprobleme sind behoben. Die Gesamt-Abnahme bleibt nur
+für den freizugebenden Gemini-Aufruf und das produktive Hosting teilweise offen.

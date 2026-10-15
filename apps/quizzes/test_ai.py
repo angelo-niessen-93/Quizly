@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -50,7 +49,7 @@ class YouTubeURLTests(SimpleTestCase):
 
 
 class AIServiceTests(SimpleTestCase):
-    @override_settings(OPENAI_API_KEY='', GEMINI_API_KEY='')
+    @override_settings(GEMINI_API_KEY='')
     def test_missing_keys_prevent_download(self):
         """No external processing starts without configured credentials."""
         with patch.object(ai, 'download_audio') as download:
@@ -58,7 +57,7 @@ class AIServiceTests(SimpleTestCase):
                 ai.generate_content(URL)
         download.assert_not_called()
 
-    @override_settings(OPENAI_API_KEY='test', GEMINI_API_KEY='test')
+    @override_settings(GEMINI_API_KEY='test')
     def test_missing_ffmpeg_is_reported(self):
         """Absent audio tools produce a safe configuration error."""
         with patch.object(ai, 'which', return_value=None):
@@ -147,20 +146,14 @@ class AIServiceTests(SimpleTestCase):
             with self.assertRaises(ai.GenerationFailed):
                 validate_generated_content(text)
 
-    @override_settings(OPENAI_API_KEY='test')
-    def test_whisper_request_and_file_closure(self):
-        """Whisper receives a binary stream that is closed after the call."""
-        with (
-            TemporaryDirectory() as directory,
-            patch.object(ai, 'OpenAI') as sdk,
-        ):
-            path = self.fake_download(URL, directory)
-            client = sdk.return_value.__enter__.return_value
-            client.audio.transcriptions.create.return_value.text = 'Transcript'
+    def test_whisper_transcribes_locally(self):
+        """Transcription delegates to local Whisper without any API client."""
+        with patch.object(
+            ai, 'transcribe_local', return_value='Transcript'
+        ) as run:
+            path = Path('local-audio.wav')
             self.assertEqual(ai.transcribe_audio(path), 'Transcript')
-            args = client.audio.transcriptions.create.call_args.kwargs
-            self.assertEqual(args['model'], 'whisper-1')
-            self.assertTrue(args['file'].closed)
+            run.assert_called_once_with(path)
 
     @override_settings(GEMINI_API_KEY='test', GEMINI_MODEL='gemini-2.5-flash')
     def test_gemini_receives_schema_and_validates_output(self):
@@ -220,7 +213,7 @@ class GenerationAPITests(APITestCase):
         generate.assert_not_called()
         self.assertFalse(Quiz.objects.exists())
 
-    @override_settings(OPENAI_API_KEY='', GEMINI_API_KEY='')
+    @override_settings(GEMINI_API_KEY='')
     def test_missing_credentials_returns_safe_503(self):
         """Missing keys return a clear failure and leave no partial quiz."""
         response = self.client.post('/api/quizzes/', {'url': URL})

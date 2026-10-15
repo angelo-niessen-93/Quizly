@@ -90,6 +90,74 @@ yt-dlp-Meldungen dessen [aktuelle Voraussetzungen](https://github.com/yt-dlp/yt-
 einschließlich JavaScript-Laufzeit beachten und yt-dlp gezielt aktualisieren.
 Die Anwendung übernimmt keine Browser-Cookies und umgeht keine Zugriffssperren.
 
+## Lokales Whisper und RTX 5070 Ti
+
+Transkription verwendet ausschließlich
+[openai/whisper](https://github.com/openai/whisper) über das Paket
+`openai-whisper==20250625`. Ein OpenAI-API-Key und das OpenAI-API-SDK sind
+nicht erforderlich; Audio bleibt für die Transkription lokal.
+
+Für die hier geprüfte RTX 5070 Ti wurde in der Backend-.venv installiert:
+
+```powershell
+python -m pip install torch==2.14.1+cu130 --index-url https://download.pytorch.org/whl/cu130
+python -m pip install -r requirements-dev.txt
+```
+
+Die CUDA-Version von PyTorch zuerst installieren; die anschließende Installation
+der Projektanforderungen behält diese kompatible Variante bei.
+Ohne NVIDIA-GPU genügt die normale Requirements-Installation mit CPU-PyTorch.
+Die globale Python-Installation anderer Projekte wird nicht verändert.
+
+Geprüft: NVIDIA-Treiber 610.74, PyTorch 2.14.1+cu130, CUDA-Runtime 13.0,
+RTX 5070 Ti mit Compute Capability 12.0 und erfolgreiche GPU-Matrixberechnung.
+
+Whisper verwendet standardmäßig `small` und `WHISPER_DEVICE=auto`.
+Auto wählt CUDA bei Verfügbarkeit, andernfalls CPU. Optional lassen sich
+`WHISPER_DEVICE=cpu` oder `cuda` ausdrücklich setzen.
+Das Modell wird erst beim ersten Transkriptionsauftrag geladen und danach
+einmal pro Django-Prozess im Speicher wiederverwendet. Ein Lock verhindert
+gleichzeitige doppelte Ladevorgänge und parallele GPU-Transkriptionen.
+Bei mehreren Serverprozessen besitzt jeder seinen eigenen Modell-Cache.
+
+Modellgewichte liegen standardmäßig in `.cache/whisper`; der erste Aufruf lädt
+`small` herunter. Dieser kostenlose Modelldownload benötigt Internetzugang,
+spätere Aufrufe verwenden die vorhandenen Gewichte.
+`.cache/` ist von Git ausgeschlossen.
+`WHISPER_CACHE_DIR` erlaubt einen anderen Cache-Ordner.
+
+Lokale Datei ohne Gemini-Aufruf transkribieren:
+
+```powershell
+python manage.py shell -c "from pathlib import Path; from apps.quizzes.ai import transcribe_audio; print(transcribe_audio(Path('sample.wav')))"
+```
+
+Eine kurze, lokal mit Windows-Sprachausgabe erzeugte WAV-Datei wurde auf
+`cuda:0` zweimal korrekt erkannt. Der Modell-Cache zeigte danach einen
+Ladevorgang und einen Cache-Treffer. Auch der echte YouTube-Download mit
+FFmpeg-Konvertierung, FFprobe-Prüfung und lokaler GPU-Transkription wurde getestet.
+
+## Gemini-Konfiguration prüfen
+
+Das einzige benötigte KI-Secret heißt exakt `GEMINI_API_KEY`.
+Die Datei `.env` muss im Backend-Ordner neben `manage.py` liegen.
+Prozessvariablen haben Vorrang vor Dateiwerten.
+
+Der vorhandene Key wurde nicht verändert. Ein frischer Django-Prozess erkennt
+ihn als gesetzt. Der vorherige Leermeldungs-Befund stammt aus der Prüfung vor
+dem Eintragen des Keys; der damals laufende Server mit `--noreload` hatte
+die neue Konfiguration noch nicht geladen. Nach Änderungen an `.env`
+den Django-Prozess neu starten.
+
+Prüfung ohne Schlüssel-Ausgabe oder API-Aufruf:
+
+```powershell
+python manage.py shell -c "from django.conf import settings; print('Gemini configured:', bool(settings.GEMINI_API_KEY.strip()))"
+```
+
+Die lokale Konfiguration ist bereit. Gültigkeit, Konto-/Modellberechtigung und
+der vollständige Gemini-Aufruf wurden ohne Kostenfreigabe nicht online geprüft.
+
 ## Umgebungsvariablen
 
 `.env` wird lokal geladen; bereits gesetzte Prozessvariablen haben Vorrang.
@@ -105,12 +173,14 @@ Die Datei ist von Git ausgeschlossen. `.env.example` enthält keine Zugangsdaten
 | `SECURE_SSL_REDIRECT` | `true`; lokal mit HTTP `false` |
 | `CSRF_TRUSTED_ORIGINS` | Explizite Frontend-Ursprünge mit Schema und Port; standardmäßig leer |
 | `CORS_ALLOWED_ORIGINS` | Explizite Frontend-Ursprünge; standardmäßig leer |
-| `OPENAI_API_KEY` | Eigener OpenAI-API-Key für Whisper; standardmäßig leer |
 | `GEMINI_API_KEY` | Eigener Gemini-API-Key; standardmäßig leer |
 | `GEMINI_MODEL` | `gemini-2.5-flash`; verfügbares Flash-Modell im eigenen Konto prüfen |
+| `WHISPER_MODEL` | `small`, lokales Whisper-Modell |
+| `WHISPER_DEVICE` | `auto`, alternativ `cuda` oder `cpu` |
+| `WHISPER_CACHE_DIR` | Optionaler Cache-Ordner; Standard `.cache/whisper` |
 | `FFMPEG_LOCATION` | Optionaler Pfad zum Verzeichnis mit FFmpeg und FFprobe |
 
-API-Keys müssen vom Betreiber eingerichtet werden. Es wurden keine erfundenen
+Der Gemini-Key muss vom Betreiber eingerichtet werden. Whisper benötigt keinen API-Key. Es wurden keine erfundenen
 Zugangsdaten und keine kostenpflichtigen Live-Anfragen verwendet.
 Ohne Keys oder Audio-Werkzeuge liefert automatische Generierung HTTP 503;
 Registrierung, Login, Verwaltung und manuell erstellte Quizze funktionieren unabhängig.
@@ -367,7 +437,7 @@ Gespeichert wird der aktuelle Versuch; eine Versuchshistorie ist nicht vorgesehe
 - 500: Tatsächlicher interner Serverfehler, beispielsweise ein unerwarteter
   Fehler bei der Datenbankspeicherung; teilweise Daten werden zurückgerollt.
 - 502: Fehler beim Download, der Transkription oder KI-Generierung.
-- 503: API-Keys oder FFmpeg/FFprobe fehlen.
+- 503: Gemini-Konfiguration oder FFmpeg/FFprobe fehlen.
 
 Die bestehenden 429/502/503-Fälle bleiben als zusätzliche Betriebsfälle erhalten.
 Externe Fehler werden nicht als interne 500-Fehler ausgegeben.
@@ -418,7 +488,7 @@ vorgesehenen Schlüssel und einen schnellen Passwort-Hasher.
 `quizly.test_settings` niemals für Entwicklung oder Produktion verwenden.
 Externe Dienste sind in Tests simuliert; es werden keine echten Kosten erzeugt.
 
-Die 83 automatisierten Tests decken Registrierung, doppelte E-Mails, Passwortvalidierung,
+Die 91 automatisierten Backend-Tests decken Registrierung, doppelte E-Mails, Passwortvalidierung,
 Cookie-Flags, Login, Token-Rotation, Logout/Blacklist, CSRF, Berechtigungen,
 CRUD, Datumsauswahl, Fortschritt, Antwortänderung, Bewertung, Wiederholung,
 Admin-Bearbeitung, URL-Validierung, KI-Schema, Rollback und Dateibereinigung ab.
@@ -455,11 +525,48 @@ Entwicklungsserver ist kein Produktionsserver.
 
 Die vollständige Zuordnung aller DoD-Punkte mit offenen externen Prüfungen steht
 in [docs/definition-of-done.md](docs/definition-of-done.md).
-Der echte YouTube -> FFmpeg -> Whisper -> Gemini-Durchlauf und die Integration eines
-nicht mitgelieferten Frontends müssen in der Zielumgebung geprüft werden.
+Der echte YouTube -> FFmpeg -> Whisper -> Gemini-Durchlauf bleibt offen.
+Das offizielle Frontend liegt separat in D:\DEVAkademie\Projekte\Quizly-Frontend
+und wurde gemeinsam mit diesem Backend lokal im Browser geprüft.
+Das Frontend synchronisiert Antworten, Wiederaufnahme und Replay jetzt mit dem Backend.
 
 Verwendete offizielle Schnittstellendokumentation:
-[OpenAI Whisper / Transkriptionen](https://developers.openai.com/api/reference/python/resources/audio/subresources/transcriptions/methods/create),
+[Lokales OpenAI Whisper](https://github.com/openai/whisper),
 [Gemini Structured Outputs](https://ai.google.dev/gemini-api/docs/structured-output),
 [yt-dlp](https://github.com/yt-dlp/yt-dlp#embedding-yt-dlp),
 [Simple JWT Blacklist und Rotation](https://django-rest-framework-simplejwt.readthedocs.io/en/stable/settings.html).
+
+
+## Lokale Integration mit dem getrennten offiziellen Frontend
+
+Backend: D:\DEVAkademie\Projekte\Quizly, Port 8000.
+Frontend: D:\DEVAkademie\Projekte\Quizly-Frontend, Port 5500.
+Beide Projekte besitzen eigene Git-Repositories und kommunizieren nur per REST.
+Die Frontend-Base-URL ist http://127.0.0.1:8000/api/.
+Die minimale CSRF-Anpassung befindet sich im separaten Frontend in shared/js/auth.js.
+
+Frontend aus dessen eigenem Verzeichnis starten:
+
+```powershell
+python -m http.server 5500 --bind 127.0.0.1
+```
+
+Anschließend http://127.0.0.1:5500/ öffnen. Backend und Frontend konsistent
+über 127.0.0.1 ansprechen. Die vorhandene lokale .env erlaubt diesen Origin.
+Den vollständigen Prüfbericht mit Paketversionen, tatsächlichen Browser-/HTTP-
+Ergebnissen, Secret-Status ohne Werte und allen Blockern findest du in
+[docs/local-integration-check.md](docs/local-integration-check.md).
+
+Der echte YouTube-Audiodownload, FFmpeg, FFprobe und lokales GPU-Whisper sind
+geprüft. Gemini ist lokal konfiguriert; ein echter Generierungsaufruf wartet
+auf ausdrückliche Kostenfreigabe. Keine kostenpflichtigen APIs wurden aufgerufen.
+Die manuelle Quiz-Erstellung und Speicherung sowie die Frontend-Synchronisierung
+von Auswahlen, Reload, Antwortänderung und Replay wurden real geprüft.
+
+Frontend-Regressionen im getrennten Frontend-Ordner ausführen:
+
+```powershell
+node --test tests/progress.test.cjs
+```
+
+Die neun Tests benötigen keine zusätzlichen Node-Pakete.

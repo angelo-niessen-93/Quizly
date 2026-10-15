@@ -8,13 +8,12 @@ from django.conf import settings
 from google import genai
 from google.genai.errors import APIError as GeminiError
 from httpx import HTTPError
-from openai import APIError as OpenAIError
-from openai import OpenAI
 from rest_framework.exceptions import APIException, ValidationError
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 
 from .ai_schema import generation_config, validate_generated_content
+from .transcription import transcribe_local
 from .validators import validate_youtube_url
 
 
@@ -32,7 +31,7 @@ class GenerationFailed(APIException):
 
 def require_configuration():
     """Fail before downloading when keys or audio tools are missing."""
-    if not settings.OPENAI_API_KEY or not settings.GEMINI_API_KEY:
+    if not settings.GEMINI_API_KEY:
         raise GenerationUnavailable()
     folder = (
         Path(settings.FFMPEG_LOCATION) if settings.FFMPEG_LOCATION else None
@@ -77,17 +76,11 @@ def download_audio(url, directory):
 
 
 def transcribe_audio(path):
-    """Send a closed-after-use audio stream to the Whisper API."""
-    with OpenAI(
-        api_key=settings.OPENAI_API_KEY, timeout=90, max_retries=1
-    ) as client:
-        with path.open('rb') as audio:
-            result = client.audio.transcriptions.create(
-                model='whisper-1', file=audio
-            )
-    if not result.text or not result.text.strip():
+    """Transcribe locally without sending audio to any external API."""
+    text = transcribe_local(path)
+    if not text:
         raise GenerationFailed()
-    return result.text.strip()
+    return text
 
 
 def generate_questions(transcript):
@@ -137,9 +130,9 @@ DOWNLOAD_OPTIONS = {
 
 GENERATION_ERRORS = (
     DownloadError,
-    OpenAIError,
     GeminiError,
     HTTPError,
     OSError,
     ValueError,
+    RuntimeError,
 )

@@ -161,8 +161,16 @@ SECURE_HSTS_PRELOAD = not DEBUG
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 FFMPEG_LOCATION = os.getenv('FFMPEG_LOCATION', '')
+if FFMPEG_LOCATION and FFMPEG_LOCATION not in os.get_exec_path():
+    os.environ['PATH'] = (
+        FFMPEG_LOCATION + os.pathsep + os.environ.get('PATH', '')
+    )
+WHISPER_MODEL = os.getenv('WHISPER_MODEL', 'small')
+WHISPER_DEVICE = os.getenv('WHISPER_DEVICE', 'auto')
+WHISPER_CACHE_DIR = Path(
+    os.getenv('WHISPER_CACHE_DIR', str(BASE_DIR / '.cache' / 'whisper'))
+)
 MAX_VIDEO_SECONDS = 1200
