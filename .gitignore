@@ -12,8 +12,12 @@ ENV/
 # Django
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
 media/*
 !media/.gitkeep
 
@@ -24,6 +28,8 @@ media/*
 
 # Test and coverage
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 .pytest_cache/
 
@@ -42,3 +48,7 @@ Thumbs.db
 staticfiles/
 .ruff_cache/
 .cache/
+
+# Temporary local files
+*.tmp
+*.temp

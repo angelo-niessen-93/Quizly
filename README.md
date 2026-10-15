@@ -2,6 +2,11 @@
 
 **Turn YouTube videos into personal, playable quizzes.**
 
+This repository contains **only the Quizly Django backend** submitted to
+Developer Akademie. The supplied frontend is not part of this submission. No
+frontend fork or separate frontend repository owned by the backend author is
+required.
+
 Quizly is a Django REST backend built as a Developer Akademie final project. It
 helps learners check what they understood from a video: submit a YouTube URL,
 generate ten multiple-choice questions, play the quiz, and review the answers.
@@ -125,9 +130,14 @@ The frontend is supplied by **Developer Akademie**:
 
 **[Developer-Akademie-Backendkurs/project.Quizly](https://github.com/Developer-Akademie-Backendkurs/project.Quizly)**
 
-The original repository is not owned by this backend's author. Clone or download
-it separately, keep its own Git repository, and retain its license and attribution.
-Frontend and backend communicate exclusively through the REST API.
+The frontend is provided by Developer Akademie and is excluded from this backend
+submission. Frontend and backend communicate exclusively through the REST API;
+there is no shared code or database. Backend installation, API use, automated
+tests, and submission do not require the frontend.
+
+For optional browser testing, keep a local frontend copy outside the backend
+repository and retain its license and attribution. No author-owned frontend
+repository or frontend publication is required.
 
 Use sibling folders, never a frontend folder inside the backend:
 
@@ -148,13 +158,12 @@ The verified local frontend copy includes these integration changes:
   selection, restore selections, handle failed saves, and invoke replay.
 - `tests/progress.test.cjs`: nine regression tests for this integration.
 
-**Fresh-clone limitation:** the inspected official upstream snapshot does not
-contain these local CSRF/progress additions. Cloning upstream alone does not
-reproduce the verified integrated frontend. Use the separately supplied integrated
-copy, or apply equivalent changes there before following the browser walkthrough.
-This backend contains neither the frontend nor a frontend patch. A public URL
-for the adapted frontend repository has not been supplied. Do not disable backend
-CSRF protection to make an unadapted frontend work.
+**Integration evidence:** browser tests used a locally adapted copy of the
+provided frontend, not the unchanged official upstream version. The upstream
+snapshot does not include the local CSRF/progress additions listed above, so a
+fresh upstream clone may behave differently. This is context for reproducing the
+browser tests, not a backend installation or submission prerequisite. No frontend
+code or patch is included here. Keep backend CSRF protection enabled.
 
 ## Installation and setup
 
@@ -166,28 +175,22 @@ For Windows, install:
   Python 3.14 is tested; Django 6.1 requires Python 3.12 or newer.
 - [Git](https://git-scm.com/downloads).
 - FFmpeg and FFprobe, installed in step 4.
-- A modern browser and internet access for YouTube, model weights, and Gemini.
+- Internet access for YouTube, model weights, and Gemini.
 - A Gemini API key for automatic generation; check its project tier and quotas.
 - Optionally, a compatible NVIDIA driver and CUDA-enabled PyTorch for GPU use.
-- Optionally, [Node.js](https://nodejs.org/en/download) for frontend tests.
-  Node.js is not required to serve the static frontend.
 
 Check `python --version` and `git --version`. The commands below assume a new
 installation. Reuse existing folders and configuration instead of overwriting them.
 
-### 2. Clone the projects separately
+### 2. Clone the backend
 
 ```powershell
-mkdir quizly-workspace
-cd quizly-workspace
 git clone https://github.com/angelo-niessen-93/Quizly.git Quizly
-git clone https://github.com/Developer-Akademie-Backendkurs/project.Quizly.git Quizly-Frontend
 cd Quizly
 ```
 
-The second clone is the official baseline, not the adapted local copy. Resolve
-the [frontend integration prerequisite](#frontend-repository-and-integration)
-before expecting CSRF-protected authentication and persisted progress to work.
+All required installation steps below run inside this backend repository.
+The Developer Akademie frontend is optional and must remain in a separate folder.
 
 ### 3. Create a virtual environment and install dependencies
 
@@ -306,42 +309,53 @@ Migration `0002_api_contract_fields` preserves content while renaming the stored
 URL field and adding timestamps. An older database using Django's standard user
 model needs a separate migration plan.
 
-### 7. Configure and serve the frontend separately
+### 7. Verify the backend independently
 
-In the integrated frontend's `shared/js/config.js`, confirm:
-
-```javascript
-const API_BASE_URL = "http://127.0.0.1:8000/api/";
-```
-
-Keep the trailing slash. Open another terminal in `quizly-workspace`:
+With Django running, use a second terminal:
 
 ```powershell
-cd Quizly-Frontend
+curl.exe http://127.0.0.1:8000/api/csrf/
+```
+
+Expect HTTP 200 and a JSON object containing `csrfToken`. No frontend, Node.js,
+Gemini request, or model download is needed for this check. Run the backend test
+commands in [Testing and verified results](#testing-and-verified-results) from
+the activated backend environment. They verify authentication, quiz generation
+with simulated providers, CRUD, progress, and replay without a browser or keys.
+
+For manual API use, use a cookie-aware HTTP client: fetch `/api/csrf/`, retain its
+cookie, and send the returned token as `X-CSRFToken` on writes. Register, log in,
+fetch a fresh CSRF token after login, then use the documented quiz routes. JWTs
+remain in the client's cookie jar. See [API documentation](#api-documentation)
+for exact request bodies, responses, and permissions.
+
+Submitting a YouTube URL makes a real Gemini request. Before doing so, check
+[current pricing](https://ai.google.dev/gemini-api/docs/pricing) and your
+[project limits](https://ai.google.dev/gemini-api/docs/rate-limits).
+There is no automatic Gemini retry, continuation, or model fallback.
+
+### Optional browser integration
+
+This is outside the required backend setup and submission. The recorded browser
+tests used the locally adapted Developer Akademie frontend described in
+[Frontend repository and integration](#frontend-repository-and-integration).
+No changes to or publication of that frontend are required by this review.
+
+For an existing adapted copy, its API base URL is
+`http://127.0.0.1:8000/api/` (including the trailing slash). Serve it separately:
+
+```powershell
+cd ..\Quizly-Frontend
 python -m http.server 5500 --bind 127.0.0.1
 ```
 
-No npm installation or build is needed. Open
-[Quizly in your browser](http://127.0.0.1:5500/). Use `127.0.0.1` consistently for
-both projects rather than mixing it with `localhost`. Do not open HTML with `file://`.
+Open [the local frontend](http://127.0.0.1:5500/). Use `127.0.0.1` consistently
+for both projects. The backend environment template already permits this local
+origin for credentialed CORS and CSRF. Do not open HTML with `file://`.
 
-### 8. Generate and play the first quiz
-
-1. Register through the integrated frontend, then log in.
-2. Submit a short public video with clear speech in the quiz library. The verified
-   example was [this TED-Ed video](https://www.youtube.com/watch?v=rb7TVW77ZCs).
-3. Wait for processing. The initial model download and CPU transcription can take
-   considerably longer than subsequent requests.
-4. Open the quiz overview and start playing. Each selection saves immediately.
-5. Reload to resume, change earlier answers if needed, and finish all ten questions
-   to see the percentage result and correct solutions.
-6. Choose replay to reset the saved attempt and play the existing quiz again.
-
-Submitting a URL makes a real Gemini request. A free model offering does not
-prove your key's project uses the Free Tier. Check
-[current pricing](https://ai.google.dev/gemini-api/docs/pricing) and
-[project limits](https://ai.google.dev/gemini-api/docs/rate-limits).
-There is no automatic Gemini retry, continuation, or model fallback.
+The recorded walkthrough covered registration, login, generating a ten-question
+quiz, autosave, reload, changing answers, percentage results, and replay. It is
+integration evidence for the backend REST API, not a frontend deliverable.
 
 ### Linux and macOS
 
@@ -357,8 +371,8 @@ test -f .env || cp .env.example .env
 
 Generate the signing key and edit `.env` as above. On Ubuntu/Debian, install audio
 tools with `sudo apt update && sudo apt install ffmpeg`; on macOS with Homebrew,
-use `brew install ffmpeg`. Verify both executables, then use the same migration,
-backend, and frontend-server commands.
+use `brew install ffmpeg`. Verify both executables, then use the same migration
+and backend-server commands. The frontend remains optional.
 
 ## Environment variables
 
@@ -739,7 +753,8 @@ preservation, cleanup, and provider failures. Offline SDK tests check thinking,
 schema, deadlines, and single-request behavior for errors, redirects, truncated
 output, and continuation responses.
 
-In the **separate integrated frontend folder**, run:
+For optional reproduction of the earlier frontend tests, in the **separate
+locally adapted frontend folder**, run:
 
 ```powershell
 node --test tests/progress.test.cjs
@@ -750,14 +765,16 @@ node --check shared/js/progress.js
 
 These nine tests use Node.js built-ins; no npm packages are required. The test
 file and progress controller are local integration additions, not guaranteed
-contents of a fresh official clone.
+contents of a fresh official clone. They are external integration evidence, not
+required backend submission checks. Node.js is only needed for these tests.
 
 Latest confirmed local results, **15 October 2026**:
 
 | Check | Confirmed result |
 | --- | --- |
-| Backend suite | 102 tests passed |
-| Integrated frontend suite | 9 tests passed |
+| Backend suite | 102 tests passed again during the backend submission review |
+| Independent backend setup | Fresh isolated database migrated; CSRF, registration, login and own-quiz listing passed without frontend or Gemini key |
+| Locally adapted frontend suite (external evidence) | 9 tests passed in the earlier integration run |
 | Audio pipeline | Real YouTube download, FFmpeg conversion, and local CUDA Whisper verified |
 | Optimized Gemini | One authorized real call: HTTP 200 in 13.460 seconds, finish reason STOP |
 | Content | Ten valid questions, forty options, one correct solution per question |
@@ -834,6 +851,13 @@ python manage.py flushexpiredtokens
 Schedule `flushexpiredtokens` periodically. Back up data and preserve third-party
 licenses and attribution notices.
 
+The repository history contains one obsolete hardcoded Django development key.
+Current code loads a different private key from the environment and rejects the
+old insecure prefix. Any deployment still using the historical key must rotate
+it. The submission audit found no current configured credentials, databases,
+or generated integration artifacts in tracked files or inspected Git history.
+Git history was not rewritten.
+
 To check secure settings locally, use a **separate activated PowerShell terminal**
 so these process overrides do not affect the HTTP development session:
 
@@ -855,9 +879,14 @@ settings can correctly produce security warnings.
 | [Definition of Done](docs/definition-of-done.md) | Requirement-by-requirement status, API contract mapping, test evidence, and remaining deployment checks |
 | [Local integration report](docs/local-integration-check.md) | Environment checks, earlier failures, timeout optimization, and successful real Gemini/API/browser results with their scope |
 
-These detailed audit documents are currently in German. This README is the English
-setup and API guide. Local verification does not imply production acceptance or
-permanently unchanged external service quotas.
+All submission documentation is in English. Local verification does not imply
+production acceptance or permanently unchanged external service quotas.
+
+The backend submission includes source code, migrations, requirements, the public
+configuration template, tests, and documentation. It excludes the supplied
+frontend, credentials, local databases, virtual environments, model weights,
+and test artifacts. Production hosting and an author-owned frontend repository
+are not prerequisites for this backend submission.
 
 ## Credits and acknowledgements
 

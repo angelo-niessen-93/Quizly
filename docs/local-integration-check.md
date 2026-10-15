@@ -1,412 +1,202 @@
-# Lokale Integrationsprüfung – aktueller Abschluss
+# Local integration report
 
-Stand: 15.10.2026, nach erfolgreichem freigegebenem Echtversuch mit optimiertem Gemini.
-Keine kostenpflichtigen Gemini- oder OpenAI-API-Aufrufe wurden ausgeführt.
+Reviewed: 15 October 2026. This English report consolidates earlier local
+integration records and the final backend submission review. Historical real
+service/browser results are distinguished from the current offline review.
 
-## Finaler optimierter Echtversuch: erfolgreich
+## Scope and submission
 
-Der Benutzer gab einen weiteren einzelnen Versuch innerhalb des bestehenden
-Free-Tier-Projekts frei. Die aktuelle öffentliche Preisliste bestätigt kostenlosen
-Standard-Textinput/-output für gemini-3.8-flash. Vor dem Versuch war die lesende
-Modellabfrage mit dem vorhandenen unveränderten Key erfolgreich und bestätigte
-generateContent. Der Projekttarif beruht auf der bestehenden Nutzerbestätigung;
-Modell-Metadaten liefern keinen unabhängigen Abrechnungsnachweis. Keine Billing-
-Einstellungen wurden verändert. Keine kostenpflichtigen Tools oder Funktionen.
+Only the Django backend is submitted. The
+[Developer Akademie frontend](https://github.com/Developer-Akademie-Backendkurs/project.Quizly)
+is provided separately and is not a deliverable. Backend and frontend were kept
+in separate folders and Git repositories and communicated only through REST.
+The browser tests used a **locally adapted** frontend based on upstream commit
+ae8e8637e39d328e3b8a55670db77f121deffb49, with credentialed CSRF handling and
+progress synchronization. A fresh upstream clone is not the tested adapted copy.
+No author-owned frontend repository or publication is required for submission.
+The final documentation review does not modify or publish the frontend.
 
-| Prüfung | Tatsächliches Ergebnis |
+## Successful authorized Gemini run - historical measured evidence
+
+The user authorized one optimized attempt using the project's confirmed Free
+Tier. At that time, public pricing listed free standard text input/output and a
+read-only model lookup with the existing key confirmed generateContent support.
+No billing settings or credentials were changed. Model metadata alone does not
+prove the project billing tier. No paid tools or features were requested.
+
+| Check | Actual result |
 | --- | --- |
-| Eingang | Vorhandenes Transkript unverändert wiederverwendet, 3834 Zeichen |
-| Transkript-SHA256 | 950ea93ce0671759c9a83c3b8d2c35f2b29d04c89a9dd087f8f65d35c28f3089 |
-| Modell | gemini-3.8-flash; identische modelVersion in echter Antwort |
-| Konfiguration | LOW, keine Thought-Ausgabe, maximal 8192 Tokens, Serverdeadline 180 Sekunden, HTTPX-Phasenlimits 190 Sekunden |
-| Wiederholungen / Fortsetzungen | Genau ein beobachteter HTTP-Generierungsrequest; attempts=1, Continuation, Function Calling und Redirects deaktiviert |
-| Gemini | HTTP 200 nach 13,460 Sekunden; finishReason STOP |
-| Gesamter Backend-POST | HTTP 201 nach 14,391 Sekunden |
-| Titel | The Science of Vaccines |
-| JSON und Lösungen | Zehn unterschiedliche Fragen, je vier unterschiedliche Textoptionen und genau eine korrekte Lösung; vorhandene Inhaltsvalidierung bestanden |
-| Quellentreue | Alle zehn Fragen und richtigen Lösungen gegen das gespeicherte Transkript geprüft |
-| SQLite | Zehn Fragen, 40 Antworten, je Frage genau ein is_correct; initialer Fortschritt angelegt |
-| Response-Vertrag | Exakte Quiz-/Fragenfelder, Integer-IDs, ISO-Zeitstempel, Antwort als Text und vier Optionen je Frage bestätigt |
-| GET-Response | HTTP 200, identischer Quizinhalt zum POST-Response |
-| Frontend im echten Edge-Browser | Anmeldung und alle zehn Fragen erfolgreich, UI 100,0 %, Backend 100,0 % |
-| Autosave / Reload | Nach drei Auswahlen Neuladen: Fortschritt erhalten, vierte Frage geöffnet |
-| Persistierte Auswertung | Zehn gespeicherte Auswahlen direkt in SQLite bestätigt |
-| Nachträgliche Änderung | Nach Abschluss erste Antwort geändert; gespeicherte Bewertung 90 % |
-| Wiederholung / Reload | Replay: attempt=2, completed=false, null Auswahlen; Zustand nach Neuladen bestätigt |
-| Testdaten | Testkonto, Tokens und Testquiz nach Prüfung entfernt; keine dauerhafte Demo-Anmeldung hinterlassen |
-| Automatisierte Tests | 102 Backend-Tests und neun Frontend-Tests erfolgreich |
+| Input | Existing transcript, 3834 characters, unchanged |
+| Transcript SHA-256 | 950ea93ce0671759c9a83c3b8d2c35f2b29d04c89a9dd087f8f65d35c28f3089 |
+| Model | gemini-3.8-flash; matching modelVersion in response |
+| Configuration | LOW thinking, no thought output, 8192-token cap, requested server deadline 180 seconds, HTTPX phase limits 190 seconds |
+| Attempts | Exactly one observed generation request; SDK attempts=1, no continuation, function calling, redirects or fallback |
+| Gemini response | HTTP 200 in 13.460 seconds; finishReason STOP |
+| Backend POST | HTTP 201 in 14.391 seconds |
+| Quiz title | The Science of Vaccines |
+| Content | Ten distinct questions, four distinct string options each, one correct answer each |
+| Source fidelity | All ten questions and solutions checked against the saved transcript |
+| SQLite | Ten questions, forty answers, one is_correct per question, initial progress record |
+| Contract | Exact quiz/question fields, integer IDs, ISO timestamps and correct answer text |
+| GET | HTTP 200, content matched the POST response |
+| Real browser | All ten questions played; UI and backend both reported 100% |
+| Autosave/reload | After three selections, reload restored progress and opened question four |
+| Persisted result | Ten selections confirmed directly in SQLite |
+| Change after completion | First answer changed; persisted score became 90% |
+| Replay/reload | attempt=2, completed=false, zero selections; reset persisted after reload |
+| Cleanup | Temporary account, tokens and quiz removed after verification |
 
-### Tatsächlich geprüfte API-Endpunkte
+The temporary test server substituted only the cached transcript for the repeated
+audio/Whisper step, as requested. The real SDK request, response validation,
+create_quiz/save_quiz logic, SQLite storage, response serializers and browser/API
+requests were exercised. The normal server was restored afterward; no production
+transcript-cache feature or API contract change was introduced.
 
-| Endpunkt | Ergebnis im echten Lauf | Abweichung |
+Provider usage was 805 prompt tokens, 1128 candidate tokens and 1933 total tokens.
+serviceTier=standard indicates the inference class, not the project's billing
+tier. No separate thinking-token counter was returned. The successful run does
+not isolate how much each optimization or service load affected latency.
+
+Local evidence was archived under ignored .cache/final-gemini-stages.jsonl,
+.cache/final-gemini-result.json, .cache/final-gemini-provider-response.json and
+.cache/final-gemini-quiz.json. These files are not submission dependencies.
+Temporary quiz ID 4 was deleted and is not a persistent demo fixture.
+
+Historical sources: [pricing](https://ai.google.dev/gemini-api/docs/pricing),
+[billing](https://ai.google.dev/gemini-api/docs/billing). Future live generation
+requires a fresh project/quota check and any required authorization. No new live
+AI request was made during this final documentation review.
+
+## Real API results from the successful run
+
+| Endpoint | Result | Scope |
 | --- | --- | --- |
-| GET /api/csrf/ | 200; CSRF für Requests und Browser verfügbar | Keine |
-| POST /api/register/ | 201 | Keine |
-| POST /api/login/ | 200; Access-/Refresh-Cookies HTTP-only | Keine |
-| POST /api/quizzes/ | 201; Request mit ausschließlich url | Audiopfad im temporären Prüfserver durch gespeichertes Transkript ersetzt, wie beauftragt |
-| GET /api/quizzes/{id}/ | 200; vollständiger Vertragsvergleich bestanden | Keine |
-| GET /api/quizzes/{id}/progress/ | 200; gespeicherte Auswahlen und Bewertung korrekt | Keine |
-| PATCH /api/quizzes/{id}/progress/ | 200; Autosave und nachträgliche Änderung im Browser | Keine |
-| POST /api/quizzes/{id}/replay/ | 200; Zustand serverseitig zurückgesetzt | Keine |
+| GET /api/csrf/ | 200 | Real requests and browser |
+| POST /api/register/ | 201 | Temporary account |
+| POST /api/login/ | 200 | HTTP-only access/refresh cookies |
+| POST /api/quizzes/ | 201 | Request contained url; cached transcript substituted only for audio processing |
+| GET /api/quizzes/{id}/ | 200 | Exact response contract checked |
+| GET /api/quizzes/{id}/progress/ | 200 | Restored selections and score |
+| PATCH /api/quizzes/{id}/progress/ | 200 | Browser autosave and answer changes |
+| POST /api/quizzes/{id}/replay/ | 200 | Server-side reset persisted |
 
-Die temporäre Einbindung ersetzte ausschließlich die erneute Audio-/Whisper-
-Verarbeitung durch das vorhandene Transkript für dieselbe Video-URL. Es wurden
-keine KI-Inhalte simuliert: generate_questions, SDK, Provideraufruf, Validierung,
-create_quiz, save_quiz, Response-Serializer und REST-/Browserzugriffe waren echt.
-Der Prüfserver wird danach durch den normalen Django-Server ersetzt. Es gibt
-keinen neuen produktiven Transkript-Cache und keine geänderten API-Verträge.
-Der Audiopfad ist durch die unten dokumentierten vorherigen echten Läufe belegt.
+Refresh, logout, CRUD, error codes and permissions are additionally covered by
+the backend automated suite described in the DoD mapping.
 
-Google meldete 805 Prompt-Tokens, 1128 Kandidaten-Tokens und 1933 Tokens gesamt.
-serviceTier=standard bezeichnet die Inferenzklasse, nicht den Billing-Tarif.
-Ein konkreter Thinking-Tokenzähler wurde in dieser Antwort nicht mitgeliefert.
-Die optimierte Konfiguration funktioniert in diesem Lauf; welchen Anteil LOW,
-Prompt oder Dienstlast an der Verbesserung hatten, ist nicht isoliert bewiesen.
+## Earlier failures and optimization
 
-Archivierte lokale Nachweise, jeweils von Git ausgeschlossen:
-.cache/final-gemini-stages.jsonl, .cache/final-gemini-result.json,
-.cache/final-gemini-provider-response.json und .cache/final-gemini-quiz.json.
-Quiz-ID 4 war eine temporäre Test-ID und ist nach Bereinigung nicht abrufbar.
-Backend und Frontend bleiben strikt getrennte Repositories; Frontend unverändert.
-Kein weiterer Generierungsaufruf, kein Commit und kein Push.
-
-**Lokale KI-Abnahme erfolgreich.** Offen bleiben das produktive Hosting/HTTPS
-und die Einsicht in konkrete RPM-/TPM-/RPD-Projektlimits in Google AI Studio.
-Jeder weitere echte Generierungsaufruf benötigt eine neue Freigabe.
-
-Quellen (15.10.2026):
-[Free-Tier-Preise](https://ai.google.dev/gemini-api/docs/pricing),
-[Abrechnung](https://ai.google.dev/gemini-api/docs/billing).
-
-## Frühere lokale Optimierung und fehlgeschlagene Versuche
-
-Die folgenden Abschnitte dokumentieren den vorherigen Stand. Aussagen über
-damals noch fehlende Freigaben oder erfolgreiche Generierung werden durch
-das aktuelle Ergebnis oben ersetzt.
-
-## Gemini-504: lokale Analyse und vorbereitete Optimierung
-
-In dieser Arbeitsphase wurden ausschließlich lokale Prüfungen und simulierte
-HTTP-Antworten verwendet. Keine Gemini-Metadatenabfragen, Tokenzählungs-API,
-Generierungsaufrufe oder neuen Audio-Downloads. Das vorhandene Transkript mit
-3834 Zeichen wurde unverändert für eine Offline-Requestvorbereitung genutzt.
-
-| Möglicher Einfluss | Befund | Änderung / verbleibende Unsicherheit |
-| --- | --- | --- |
-| Clientseitiges Zeitlimit | SDK timeout=90000 ms wurde zu HTTPX connect/read/write/pool=90 Sekunden | Jetzt 190 Sekunden je Phase; kein garantierter Gesamt-Wallclock-Timeout |
-| Serverseitiges Zeitlimit | Installiertes SDK erzeugte daraus zusätzlich X-Server-Timeout: 90; alter echter 504 nach 90,14 Sekunden | Explizit angeforderte 180 Sekunden, Clientreserve zehn Sekunden; Einhaltung und Dienstkapazität noch nicht real geprüft |
-| Thinking | Nicht konfiguriert; Google dokumentiert medium als Standard für 3.8 Flash | Explizit low, keine Thought-Ausgabe; tatsächliche Latenzverbesserung noch offen |
-| Promptumfang | 3834 Zeichen Transkript; bisheriger Systemprompt 310 Zeichen | Systemprompt 266 Zeichen; kein Beleg, dass die Eingangslänge den Fehler verursachte |
-| Ausgabelänge | Kein anwendungseigenes max_output_tokens gesetzt; keine echte Tokenstatistik vom fehlgeschlagenen Aufruf | 8192 einschließlich Thinking; kurze Texte, keine Erklärungen; MAX_TOKENS kann weiterhin zu sicher verworfener Teilantwort führen |
-| Automatische Wiederholungen | attempts=1 war gesetzt, aber SDK kann zusätzlich automatisch CONTINUATION folgen | Attempts weiterhin eins; Continuation, Function Calling und HTTP-Redirects explizit aus; keine Modelle als Fallback |
-| HTTPX-Verbindungs-Retries | Standard-Transport hat retries=0 | Nicht aktiviert; simulierte ConnectError/ReadTimeout enden nach einem Request |
-| Vorübergehender Gemini-Dienstfehler | Ein einzelner 504 und keine weiteren Servermetriken | Weder bewiesen noch ausgeschlossen; keine Live-Diagnose in dieser Phase |
-
-Der beobachtete 504 war eine tatsächliche Providerantwort mit DEADLINE_EXCEEDED,
-kein nachgewiesener lokaler ReadTimeout. Die SDK-Weitergabe der alten 90 Sekunden
-an den Server wurde mit Dummy-Key und MockTransport lokal reproduziert. Die
-Deadline ist damit ein konkreter Einfluss; eine einzelne abschließende Ursache
-für die zu lange Berechnung lässt sich daraus nicht bestimmen.
-
-Das bestehende Response-Schema stammt weiterhin aus QuizContentSerializer:
-genau zehn Fragen, jeweils vier Antworten, erforderliche Text- und Booleanfelder.
-Die vorhandene Inhaltsvalidierung fordert unterschiedliche Fragen/Optionen und
-genau eine korrekte Antwort je Frage. Öffentliche Responses, Feldnamen, Statuscodes,
-Fortschritt und Auswertung bleiben unverändert. Developer API wird explizit
-gewählt; Modell gemini-3.8-flash und vorhandener API-Key bleiben unverändert.
-
-### Tatsächlich ausgeführte lokale Prüfungen
-
-- google-genai 2.31.0, HTTPX 0.28.1; SDK-Mindestversion auf 2.31 angehoben.
-- Neun neue Tests mit echtem SDK und HTTPX MockTransport: LOW und Tokenlimit im
-  Body, Schema 10/4, Deadline-/HTTPX-Einheiten, konfigurierbare Limits,
-  keine Retries bei 408/429/500/502/503/504 oder Netzwerkfehlern, kein
-  Redirect-Folgeaufruf, kein CONTINUATION-Folgeaufruf, abgewiesenes Teil-JSON
-  bei MAX_TOKENS. Keine Verbindung zu Google.
-- Gesamte Testsuite: 102 Backend-Tests und neun Frontend-Tests erfolgreich.
-- Ruff, Formatierung und 14-Zeilen-/snake_case-/Docstring-Prüfung erfolgreich.
-- `python scripts/prepare_gemini_test.py` mit dem tatsächlichen gespeicherten
-  Transkript ausgeführt. Dummy-Key, in-memory Transport, null Providerrequests.
-- `.cache/gemini-next-request.json` enthält den serialisierten Request ohne
-  Zugangsdaten: 5029 Bytes JSON-Body, LOW, 8192 Tokens, Serverdeadline 180 und
-  HTTPX-Phasenlimits 190 Sekunden. Der Transkript-Hash erlaubt die Wiedererkennung.
-  Die Datei enthält den vollständigen Quelltext und bleibt von Git ausgeschlossen.
-- Frontend unverändert und weiterhin im separaten Repository.
-
-### Vorbereiteter einzelner Echtversuch: noch nicht freigegeben
-
-1. Gesonderte Nutzerfreigabe und weiterhin kostenlosen Projekttarif bestätigen.
-2. Gespeichertes Transkript direkt verwenden; keine erneute Transkription nötig.
-3. Genau einen echten generateContent-Request mit optimierter Konfiguration
-   beobachten; weder Retry noch Continuation, Function Calling oder Fallback.
-4. Bei Fehler HTTP-Code und bereinigte Meldung erfassen und stoppen.
-5. Bei Erfolg Inhalte validieren, über vorhandene Services atomar speichern,
-   den dokumentierten API-Response prüfen und das Quiz im Frontend spielen.
-
-Die Optimierung ist lokal abgesichert, aber noch kein erfolgreicher echter
-Generierungsnachweis. Der letzte echte Aufruf bleibt der unten dokumentierte 504;
-es wurde kein neues Quiz erzeugt. Hosting und erfolgreiche Gesamtabnahme bleiben offen.
-
-Quellen (15.10.2026):
-[Thinking/Tokenlimit](https://ai.google.dev/gemini-api/docs/generate-content/thinking),
-[SDK](https://github.com/googleapis/python-genai),
-[Structured Outputs](https://ai.google.dev/gemini-api/docs/structured-output).
-
-## Letzter echter Versuch mit Gemini 3.8 Flash: HTTP 504
-
-Für diesen Folgeversuch bestätigte der Benutzer erneut den Free Tier seines
-Projekts und erlaubte höchstens einen echten Generierungsaufruf. Standard-
-Textinput und Textoutput sind laut aktueller Google-Preisliste dort kostenlos.
-Es wurden keine Tools, Grounding, Batch-Jobs, kostenpflichtigen Funktionen oder
-anderen Modelle aufgerufen. Der vorhandene Key blieb unverändert.
-
-Die lesende Abfrage für models/gemini-3.8-flash war erfolgreich und nennt
-generateContent als unterstützte Aktion. Sie garantiert weder freie Kapazität
-noch einen erfolgreichen Abschluss. Konkrete RPM-/TPM-/RPD-Projektwerte waren
-weiterhin nicht einsehbar; es werden keine numerischen Limits behauptet.
-
-| Schritt | Tatsächliches Ergebnis des Folgeversuchs |
+| Attempt | Actual outcome |
 | --- | --- |
-| Modell / Methode | gemini-3.8-flash; generateContent über Metadaten bestätigt |
-| Transkript wiederverwenden | Vorheriges Transkript nicht gespeichert; geeignetes YouTube-Video erneut verarbeitet |
-| Video | https://www.youtube.com/watch?v=rb7TVW77ZCs; TED-Ed, ca. 275 Sekunden |
-| yt-dlp / FFmpeg | MP3 erfolgreich, 2.201.132 Bytes, 3,81 Sekunden |
-| Lokales Whisper small | Erfolgreich, 3.834 Zeichen, 18,33 Sekunden |
-| Registrierung / Login | Erfolgreich, beide JWT-Cookies HTTP-only |
-| POST /api/quizzes/ | Ein echter Request mit ausschließlich url; HTTP 502 nach 112,30 Sekunden |
-| Tatsächliche Gemini-HTTP-Requests | Genau einer; HTTP-Request-Hook mit persistenter Einmal-Sperre; SDK attempts=1 |
-| Gemini-Antwort | HTTP 504, DEADLINE_EXCEEDED; 90,14 Sekunden |
-| Exakte bereinigte Provider-Meldung | Deadline expired before operation could complete. |
-| Öffentliche API-Fehlermeldung | Quiz generation failed. Please try again later. |
-| Generierte Fragen / Antwortmöglichkeiten | 0 / 0; kein Quiz-JSON geliefert |
-| JSON / Lösungen validieren, Quiz speichern und GET abrufen | Nicht erreicht; keine erfolgreiche Generierungsantwort |
-| Generiertes Quiz im Frontend spielen / auswerten | Nicht erreicht; kein Ersatzquiz als KI-Erfolg ausgegeben |
-| Separates Frontend im echten Edge-Browser | Login-Seite erreichbar; credentialed CSRF-Fetch zur Backend-API HTTP 200, CORS erfolgreich |
-| Audio-Dateien / Testkonto / Tokens | Audioordner gelöscht; Testkonto und Tokens entfernt |
-| Automatisierte Tests | 93 Backend-Tests und neun Frontend-Tests erfolgreich |
+| Earlier gemini-2.5-flash | Provider HTTP 404 after 0.84 seconds; backend returned safe 502 after 24.50 seconds including audio processing; no partial quiz |
+| Earlier unoptimized gemini-3.8-flash | HTTP 504 DEADLINE_EXCEEDED after 90.14 seconds: "Deadline expired before operation could complete." Backend returned 502 after 112.30 seconds; no partial quiz or retry |
+| Final optimized gemini-3.8-flash | HTTP 200 in 13.460 seconds, valid content and successful persistence/browser play |
 
-Der 504 ist ein Provider-Deadline-Fehler, kein nachgewiesener Fehler des Keys
-oder der Quizvalidierung. Es gab weder einen automatischen noch einen manuellen
-zweiten Generierungsaufruf in diesem Folgeversuch. Ein längeres Timeout oder
-andere Generierungsparameter wurden ohne weiteren Echtversuch nicht als Lösung
-behauptet. Die bestehenden API-Verträge und die sichere 502 bleiben unverändert.
+The 504 was a provider response, not a demonstrated local ReadTimeout. Offline
+SDK inspection reproduced the old timeout=90000 setting as both HTTPX 90-second
+phase limits and X-Server-Timeout: 90. This was a concrete deadline constraint;
+a unique cause of slow provider computation was not established.
 
-Ein neuer netzwerkfreier Regressionstest bildet die beobachtete Provider-504
-nach: Die API antwortet mit 502, gibt keine privaten Providerdetails aus und
-speichert kein Teilquiz. Der vorhandene SDK-Transporttest prüft zusätzlich,
-dass temporäre Fehler nur einen tatsächlichen HTTP-Versuch auslösen.
-
-Die zusätzliche SQLite-Nachprüfung im temporären Prüfskript verwendete zunächst
-auth_user statt der vorhandenen Tabelle accounts_user und scheiterte separat.
-Das war nicht die Ursache der API-502. Die Nachprüfung wurde über das tatsächliche
-Django-Benutzermodell durchgeführt: null verbliebene Testkonten und null ihnen
-zugeordnete Quizze. Der automatisierte Provider-504-Test prüft den unveränderten
-Quizbestand vor einer Bereinigung in einer isolierten Testdatenbank.
-
-Das neue Transkript liegt für einen ausdrücklich freigegebenen Folgeversuch
-unter .cache/flash38-transcript.txt. Der Ordner ist von Git ausgeschlossen;
-temporäres Audio und Prüfserver werden nicht dauerhaft benötigt.
-
-**Offen:** Erfolgreiche Gemini-Antwort mit zehn validierten Fragen und vier
-Optionen je Frage, deren SQLite-Speicherung, exakter GET-Response und Spiel
-dieses tatsächlich generierten Quiz im Frontend. Ein weiterer Generierungsaufruf
-benötigt eine neue Freigabe. Backend und Frontend bleiben eigenständige
-Repositories; es wurde nichts committet oder gepusht.
-
-Quellen (15.10.2026):
-[Preise](https://ai.google.dev/gemini-api/docs/pricing),
-[Limits](https://ai.google.dev/gemini-api/docs/rate-limits).
-
-## Vorheriger Versuch mit Gemini 2.5 Flash
-
-Der Benutzer bestätigte den Free Tier seines Projekts und erlaubte genau
-einen kostenlosen Versuch. Googles Preisliste bestätigt kostenlosen Textinput
-und Textoutput für Gemini 2.5 Flash im Free Tier. Projektbezogene numerische
-RPM-/TPM-/RPD-Limits und Restkontingente waren hier nicht einsehbar; Google
-verweist dafür auf AI Studio. Es wurden keine Quotenwerte erfunden.
-
-| Schritt | Tatsächliches Ergebnis dieses Versuchs |
+| Concern | Optimization / conclusion |
 | --- | --- |
-| Gemini-Konfiguration | Key gesetzt und unverändert; beim Test gemini-2.5-flash |
-| Modell-Metadaten / Modellliste | Erfolgreiche lesende Requests; generateContent wird aufgeführt, dies beweist keine Generierungsberechtigung |
-| Registrierung / Login / Cookies | HTTP 201 / 200; beide JWT-Cookies HTTP-only |
-| POST /api/quizzes/ mit ausschließlich url | Genau einmal über echten lokalen Django-Server; HTTP 502 nach Providerfehler |
-| Öffentliches gesprochenes Video | TED-Ed: How do vaccines work?; https://www.youtube.com/watch?v=rb7TVW77ZCs; ca. 275 Sekunden |
-| yt-dlp und FFmpeg | Erfolgreich; MP3 mit 2.201.132 Bytes; 3,80 Sekunden |
-| Lokales Whisper small / CUDA | Erfolgreich; 3.834 Zeichen Transkript; 19,84 Sekunden |
-| Gemini Flash | Genau ein echter Generierungsversuch; ClientError, HTTP 404 nach 0,84 Sekunden |
-| Generierte Fragen / Antworten | 0 / 0; kein gültiger Modellinhalt zur Validierung oder Speicherung |
-| Gesamter POST | 24,50 Sekunden; sichere 502 ohne Providerdetails oder Zugangsdaten |
-| Generiertes Quiz speichern und GET abrufen | Nicht erreicht; kein generiertes Quiz vorhanden |
-| Generiertes Quiz im Frontend spielen / auswerten | Nicht erreicht; kein manuelles Testquiz als Ersatz ausgegeben |
-| Temporäre Dateien / Testkonto | Temporärer Audioordner entfernt; isoliertes Testkonto und Tokens entfernt |
+| Server deadline | Explicit requested 180 seconds |
+| Client timeout | 190 seconds for connect/read/write/pool; not a total wall-clock guarantee |
+| Thinking | Explicit low and no thought output, replacing an unspecified level |
+| Prompt | Compact instructions, reduced from 310 to 266 characters plus the unchanged transcript |
+| Output | 8192 tokens including thinking; concise question content, no explanations |
+| JSON | Structured schema from QuizContentSerializer; exactly ten questions and four answers, then semantic validation |
+| Hidden follow-up calls | attempts=1 plus continuation, automatic function calling and redirects disabled |
+| Provider instability | Neither proved nor excluded by a single 504 |
 
-Google beschränkt 2.5-Modelle auf zuvor aktive Projekte. Das ist eine plausible
-Erklärung für den 404; die konkrete Providerursache ist nicht abschließend
-bewiesen. Ein nichtleerer Key, eine Modellliste und gültige Free-Tier-Preise
-sind keine Garantie für einen erfolgreichen generateContent-Aufruf.
+Nine offline tests use the real Google SDK with HTTPX MockTransport. They cover
+serialized LOW/schema/token limits, deadline units, configurable limits, one
+attempt on provider/network errors, no redirect or continuation follow-up, and
+safe rejection of truncated MAX_TOKENS output. No Google connection is needed.
+The offline preparation script uses a dummy key and the ignored saved transcript;
+it is optional and has no live mode.
 
-Nach dem fehlgeschlagenen Versuch wurden Standard, .env.example und die
-nicht geheime lokale GEMINI_MODEL-Einstellung auf gemini-3.8-flash vorbereitet.
-Dieses Modell wird in der lesend abgerufenen Modellliste aufgeführt und von
-Google für neue Projekte empfohlen; Textinput/-output sind im Free Tier frei.
-Der vorhandene API-Key wurde dabei nicht verändert. Es wurde weder mit diesem
-Modell noch mit einem anderen Modell eine weitere Generierung ausgeführt.
-Die Änderung ist deshalb ausdrücklich noch kein erfolgreicher Funktionstest.
+## Audio and local environment - earlier real checks
 
-Automatische SDK-Retries sind jetzt deaktiviert: attempts=1. Ein zusätzlicher
-Test mit echtem SDK und lokalem HTTP-MockTransport prüft, dass selbst ein
-temporärer HTTP-503-Providerfehler nur einen HTTP-Versuch auslöst. Kein
-automatischer Modell-Fallback. Aktuell: 92 Backend- und neun Frontend-Tests
-erfolgreich; API-Verträge unverändert; Frontend unverändert und separat.
-
-Für den nächsten Versuch: konkrete Free-Tier-Projektlimits in AI Studio
-prüfen und einen weiteren einmaligen Aufruf freigeben. Erfolgreiche Generierung,
-zehn validierte Fragen, SQLite-Speicherung, GET und Browser-Spiel bleiben offen.
-
-Quellen (15.10.2026):
-[Preise](https://ai.google.dev/gemini-api/docs/pricing),
-[Limits](https://ai.google.dev/gemini-api/docs/rate-limits),
-[Modellzugriff](https://ai.google.dev/gemini-api/docs/deprecations).
-
-## Frühere lokale Nachweise
-
-Die folgenden Abschnitte dokumentieren die vorangegangene Audio- und
-Fortschrittsprüfung. Aussagen über den damals noch nicht ausgeführten
-Gemini-Aufruf werden durch das aktuelle Ergebnis oben ersetzt.
-
-## Getrennte Repositories und laufende Dienste
-
-- Backend: D:\DEVAkademie\Projekte\Quizly, eigenes .git,
-  http://127.0.0.1:8000/.
-- Frontend: D:\DEVAkademie\Projekte\Quizly-Frontend, eigenes .git,
-  http://127.0.0.1:5500/.
-- Frontend-Quelle:
-  [Developer-Akademie-Backendkurs/project.Quizly](https://github.com/Developer-Akademie-Backendkurs/project.Quizly),
-  Ausgangscommit ae8e8637e39d328e3b8a55670db77f121deffb49.
-- Kommunikation ausschließlich per REST; keine Frontend-Dateien im Backend.
-- Keine Commits, Pushes oder Änderungen am GitHub-Repository der Akademie.
-
-## Whisper, PyTorch und FFmpeg
-
-| Prüfung | Tatsächliches Ergebnis |
+| Check | Confirmed result |
 | --- | --- |
-| openai-whisper | 20250625 in Backend-.venv installiert; Paket aus openai/whisper |
-| OpenAI-Transkriptions-API | Vollständig entfernt; OpenAI-API-SDK aus Requirements und .venv entfernt |
-| Modell | small; offizieller Modelldownload im ignorierten Cache |
-| PyTorch | 2.14.1+cu130, innerhalb der Backend-.venv |
-| NVIDIA | RTX 5070 Ti, Treiber 610.74, Compute Capability 12.0 |
-| CUDA | Runtime 13.0, verfügbar; echte Tensor-Matrixmultiplikation erfolgreich |
-| Tatsächliche Modellplatzierung | cuda:0 |
-| Modellwiederverwendung | Zwei lokale Aufrufe: ein Cache-Miss, ein Cache-Hit |
-| FFmpeg | 9.0.2, ffmpeg -version erfolgreich |
-| FFprobe | 9.0.2, ffprobe -version erfolgreich |
-| Windows-Installation | winget install --id Gyan.FFmpeg -e, Installer-Hash verifiziert |
-| Erreichbarkeit | Windows-Befehle nach PATH-Aktualisierung; zusätzlich FFMPEG_LOCATION in .env gesetzt |
+| FFmpeg and FFprobe | 9.0.2, both version commands successful |
+| Windows installation | WinGet Gyan.FFmpeg, installer hash verified; PATH and FFMPEG_LOCATION working |
+| openai-whisper | 20250625, local small model; no OpenAI API key or paid transcription API |
+| PyTorch | 2.14.1+cu130 |
+| GPU | RTX 5070 Ti, driver 610.74, compute capability 12.0 |
+| CUDA | Runtime 13.0, real matrix multiplication and model placement on cuda:0 verified |
+| Model reuse | Two local audio calls: one model-load cache miss, one cache hit |
+| Local WAV | Known English sentence recognized correctly twice; second call about 0.44 seconds |
+| Spoken YouTube source | rb7TVW77ZCs, approximately 275 seconds |
+| Audio processing | MP3 2201132 bytes; download/conversion 3.81 seconds |
+| Whisper | 3834-character transcript in 18.33 seconds |
+| Cleanup | Temporary audio directory removed after processing |
 
-FFMPEG_LOCATION zeigt auf den bin-Ordner der WinGet-Installation.
-Die Django-Einstellungen ergänzen diesen Pfad für lokale Whisper-Unterprozesse.
-Der vorhandene Gemini-Key wurde beim Aktualisieren dieser nicht geheimen
-Einstellung unverändert erhalten.
+An earlier music-video smoke test also produced MP3 (213.04 seconds, 1704812
+bytes) and a nonempty 1773-character transcript; the clear-speech source above
+was used for the final quiz content. The Whisper model is lazy-loaded once per
+process; a lock serializes loading and inference. Tests cover CPU fallback,
+FP16 selection, caching and recovery after a load failure.
 
-Eine lokale WAV-Datei wurde mit Windows-Sprachausgabe erzeugt.
-Whisper erkannte den bekannten englischen Testsatz korrekt; beide Aufrufe
-lieferten denselben Text. Der zweite Aufruf benötigte ungefähr 0,44 Sekunden
-einschließlich Spracherkennung, ohne erneutes Modellladen.
+## Configuration and browser progress - earlier real checks
 
-Das Modell wird pro Prozess einmal lazy geladen. Ein Lock umfasst Laden und
-Inferenz, sodass parallele Requests nicht mehrere Modelle laden.
-Die Tests prüfen auch CPU-Fallback, FP16-Auswahl und Wiederholung nach Ladefehler.
+GEMINI_API_KEY was present and loaded by a fresh Django process without exposing
+or changing it. The earlier empty-key observation predated key entry; an old
+server needed restarting. The actual variable name and dotenv loading were
+correct. Exported process variables take precedence over .env.
 
-## Gemini und .env ohne Secret-Ausgabe
+The current default model is gemini-3.8-flash. Whisper defaults to small/auto;
+its cache and all local credentials remain ignored. Local HTTP uses an explicit
+Secure=false exception; application defaults remain secure. CORS/CSRF permit the
+configured local frontend origin, with credentialed requests and HTTP-only JWTs.
 
-| Variable | Ergebnis |
+Earlier browser checks used Edge 155.0.4283.45 and Selenium 4.43.0 against real
+Django and SQLite. They verified registration/login, immediate autosave without
+clicking Next, restored selection after reload, replacement without duplicate
+selection rows, percentage results, edits after completion, replay and reset
+persistence. Injected save failure 503 caused UI rollback; a later save succeeded.
+The adapted frontend serializes writes to avoid reordering. Its nine automated
+tests passed in the earlier run. That frontend is not included in this submission
+and was not modified during the final backend documentation review.
+
+## Backend submission review and limits
+
+The README now provides a backend-only installation path, API-client verification,
+and optional frontend context. The DoD mapping is in English and identifies all
+required backend functionality as complete. Ignore rules exclude environment
+files, SQLite/database sidecars, caches, virtual environments and temporary files.
+Current secret values were not found in tracked files or any inspected Git
+history blobs. No database, environment-secret file or generated audio/model
+artifact was found among tracked files or historical paths.
+
+One old hardcoded django-insecure development key remains in Git history. It is
+not used by current code, its prefix is rejected at startup, and it differs from
+the current private key. Any historical deployment using it must rotate that key.
+No Git history rewrite or credential change was performed.
+
+The final review completed these checks without live AI calls:
+
+| Current review check | Result |
 | --- | --- |
-| GEMINI_API_KEY | Im Backend-.env vorhanden; von frischem Django-Prozess geladen |
-| GEMINI_MODEL | gemini-2.5-flash |
-| OPENAI_API_KEY | Keine Anwendungseinstellung mehr; nicht benötigt |
-| WHISPER_MODEL | small als Standard |
-| WHISPER_DEVICE | auto, tatsächlich CUDA gewählt |
-| WHISPER_CACHE_DIR | Standard .cache/whisper, von Git ausgeschlossen |
-| FFMPEG_LOCATION | Konfiguriert; beide Programme tatsächlich erreichbar |
-| Django SECRET_KEY | Vorhanden; Wert nicht ausgegeben |
-| CORS und CSRF | Bestehende lokale Origins auf Port 5500 beibehalten |
-| Cookie-Einstellungen | HTTP-only aktiv; Secure=false ausschließlich für bestehenden lokalen HTTP-Betrieb |
+| Complete backend suite | 102 passed in 9.369 seconds |
+| Ruff lint and formatting | Passed; 50 Python files already formatted |
+| Function size, naming and docstrings | Passed |
+| Migration completeness | No changes detected |
+| Installed dependencies | pip check passed |
+| Secure Django configuration | check --deploy passed with secure process overrides |
+| Fresh backend-only database | All migrations and Django checks passed |
+| Independent API smoke check | CSRF 200, registration 201, login 200, own quiz list 200; HTTP-only cookies verified |
+| Ignore rules | Thirteen path cases checked, including SQLite sidecars and public template exception |
+| Tracked/history artifact paths | None found |
+| Documentation | English, local links and README section anchors checked |
 
-Der frühere Leermeldungs-Befund war vor dem Eintragen des Keys entstanden.
-Die aktuelle Datei verwendet bereits den richtigen Namen. Ein frischer Prozess
-liest den Key; der alte Entwicklungsserver musste neu gestartet werden.
-Es wurde weder ein gültiger Key verändert noch ein Ersatzwert erfunden.
+The independent smoke check used Django's CSRF-enforcing test client in an
+isolated backend-only source copy with a new signing key and database, no frontend,
+and no Gemini key. It used already installed dependencies; it was not a fresh
+operating-system/package installation. The temporary source/database directory
+was removed. The frontend's earlier nine tests were not rerun or modified during
+this backend-only review.
 
-Konfigurationsprüfung für Gemini und beide Audio-Werkzeuge erfolgreich.
-Die externe Gültigkeit und Modellberechtigung des Gemini-Keys bleibt ohne
-freigegebenen echten Aufruf ungeprüft.
-
-## Echte Verarbeitungskette und ihre Grenze
-
-| Stufe | Ergebnis |
-| --- | --- |
-| YouTube-URL / Metadaten | Erfolgreich, echter Netzwerkzugriff |
-| yt-dlp Audio-Download | Erfolgreich, echtes Beispielvideo dQw4w9WgXcQ |
-| FFmpeg MP3-Konvertierung | Erfolgreich |
-| FFprobe | mp3, 213,04 Sekunden, 1.704.812 Bytes |
-| Lokales Whisper small auf GPU | Erfolgreich, nichtleeres Transkript mit 1.773 Zeichen |
-| Temporäre Dateien entfernen | Erfolgreich, temporärer Ordner nach Verarbeitung nicht mehr vorhanden |
-| Gemini-Generierung | Nicht ausgeführt: Kostenfreigabe fehlt |
-| Tatsächliches Gemini-Ergebnis → Datenbank | Offen bis zum freigegebenen Gemini-Durchlauf |
-| Manuelles Testquiz → Datenbank | Erfolgreich, echte REST-Requests mit zehn Fragen und 40 Antworten |
-| Generierte JSON-Inhalte validieren und speichern | Weiterhin durch Tests mit simuliertem Gemini-Inhalt abgesichert |
-
-Der Transkriptinhalt des YouTube-Beispiels wurde nicht im Bericht gespeichert.
-Der echte kostenlose Audiopfad ist damit geprüft. Ein manuelles Testquiz
-oder ein simuliertes Gemini-Ergebnis ersetzt keinen echten Gemini-Nachweis.
-
-## Fortschritt im echten Browser und in SQLite
-
-Geprüft mit Microsoft Edge 155.0.4283.45 und Selenium 4.43.0.
-Der Browser kommunizierte mit dem echten Django-Server und SQLite.
-Testbenutzer, Tokens und manuelle Quizdaten wurden nach dem Test entfernt.
-
-| Schritt | Tatsächliches Ergebnis |
-| --- | --- |
-| Registrierung und Login | Weiterhin erfolgreich über echte Formulare |
-| Auswahl ohne Weiter-Klick | Sofort PATCH; gespeicherte Auswahl direkt in SQLite nachgewiesen |
-| Neuladen | Erster unbeantworteter Eintrag geöffnet; bisherige Auswahl beim Zurückgehen markiert |
-| Antwort ändern | Auswahl ersetzt, weiterhin genau ein Datensatz für dieselbe Frage |
-| Erneutes Neuladen | Geänderte Antwort korrekt wiederhergestellt |
-| Zehn Fragen abschließen | completed=true, zehn gespeicherte Auswahlen, UI und Backend zeigen 90 % |
-| Antwort nach Abschluss ändern | Gespeicherte Bewertung und bestehende UI-Auswertung wechseln auf 100 % |
-| Wiederholen | POST replay; attempt=2, completed=false und null Auswahlen |
-| Neuladen nach Wiederholung | Zurückgesetzter Zustand bleibt erhalten |
-| Eingespritzter Speicherfehler 503 | Kein falscher Erfolgszustand; UI-Auswahl wird auf bestätigten Serverstand zurückgesetzt |
-| Danach erneut speichern | Erfolgreich, Backend erhält die Auswahl |
-
-Ein dabei gefundener Fehler in restoreSelectedAnswer wurde behoben:
-Eine fehlende gespeicherte Auswahl entfernt jetzt eine zuvor markierte
-Antwort. Ein zusätzlicher automatisierter Frontend-Test sichert das ab.
-
-QuizProgress serialisiert Schreibzugriffe, damit schnelle Änderungen und
-Replay nicht in anderer Reihenfolge auf dem Server ankommen. Fehler brechen
-die Warteschlange nicht dauerhaft; weitere Versuche bleiben möglich.
-Die bestehenden öffentlichen Quiz-Response-Felder wurden nicht geändert.
-
-## Automatisierte Prüfungen
-
-- 91 Backend-Tests erfolgreich: bisherige 83 Regressionen mit angepasstem
-  Transkriptionstest sowie acht neue lokale Whisper-Tests.
-- Neun Frontend-Tests erfolgreich: Wiederherstellung, Autosave-Zuordnung,
-  Ersetzen, Reihenfolge, Reload, Replay, Fehler-/Retry-Verhalten,
-  unbekannte Antworten und UI-Rollback.
-- Ruff, Formatierung, 14-Zeilen-/snake_case-/Docstring-Prüfung erfolgreich.
-- Keine ausstehenden Modellmigrationen oder Abhängigkeitskonflikte.
-- JavaScript-Syntax und git diff --check in beiden Repositories geprüft.
-- Backend-API-Verträge, Cookies und Berechtigungen bleiben unverändert.
-
-## Damals noch offen; aktueller Stand siehe oben
-
-- Ausdrückliche Freigabe für einen echten Gemini-Aufruf.
-- Anschließend Gemini-Key-/Modellberechtigung sowie vollständige Kette
-  YouTube → Audio → lokales Whisper → Gemini → Quiz → Datenbank prüfen.
-- Produktives Hosting und HTTPS separat abnehmen.
-
-Es fehlen keine lokalen Audio-Werkzeuge und kein OpenAI-API-Key mehr.
+No backend implementation blocker remains for the backend-only submission.
+Production hosting/HTTPS and independently inspected numeric project RPM/TPM/RPD
+limits remain operational checks, not missing backend code. No frontend fork is
+required. There were no frontend changes, commits or pushes in this review.

@@ -1,171 +1,142 @@
-# Definition of Done - Abnahmestatus
+# Definition of Done - Backend submission review
 
-Stand: 15.10.2026. „Erledigt“ bezeichnet implementierte und lokal geprüfte
-Backend-Funktionalität. „Teilweise erledigt“ kennzeichnet implementierte externe
-Integrationen, deren erfolgreicher echter Dienstaufruf noch nicht belegt ist.
+Reviewed: 15 October 2026. **Done** means implemented and verified locally.
+All required backend items below are done. External deployment checks are listed
+separately and are not requirements for this backend submission.
 
-## 1. Authentifizierung
+## Submission scope
 
-| Anforderung | Status | Nachweis |
+Only this Django backend is submitted to Developer Akademie. The
+[official frontend](https://github.com/Developer-Akademie-Backendkurs/project.Quizly)
+is supplied by Developer Akademie and is not part of the submission. The two
+applications communicate exclusively through the REST API. Browser integration
+was verified with a locally adapted frontend, kept outside this repository.
+No frontend fork, author-owned frontend repository, or frontend publication is
+required. Backend setup and automated tests work independently of the frontend.
+
+## 1. Authentication
+
+| Requirement | Status | Evidence |
 | --- | --- | --- |
-| Registrierung mit Username, E-Mail, Passwort, Bestätigung | Erledigt | RegisterSerializer, Registrierungstests |
-| Validierung einschließlich doppelter E-Mails | Erledigt | Django-Passwortregeln und case-insensitive DB-Constraint |
-| Login mit Access- und Refresh-JWT | Erledigt | Echter Cookie-Login in API-Tests |
-| Beide Tokens ausschließlich in sicheren HTTP-only-Cookies | Erledigt | Secure standardmäßig aktiv, Cookie-Flags getestet; lokale HTTP-Ausnahme explizit konfiguriert |
-| Refresh, Logout und Blacklist | Erledigt | Rotation, Wiederverwendung und Widerruf beider Tokens getestet |
-| Geschützte API und sichere Fehlermeldungen | Erledigt | Standardmäßig IsAuthenticated, generische Login-/Providerfehler |
+| Username, email, password and confirmation registration | Done | Registration serializer and API tests |
+| Validation, including duplicate email addresses | Done | Django password validators and case-insensitive database uniqueness |
+| Login with access and refresh JWTs | Done | Cookie login and exact response contract tests |
+| Both tokens exclusively in secure HTTP-only cookies | Done | HttpOnly, Secure and SameSite tests; Secure defaults to true, local HTTP exception documented |
+| Refresh, logout and blacklist | Done | Rotation, reuse prevention, access-session revocation and cookie deletion tests |
+| Protected endpoints and safe errors | Done | Default authenticated access, ownership checks and generic authentication/provider errors |
 
-## 2. Quiz-System
+## 2. Quiz system
 
-| Anforderung | Status | Nachweis |
+| Requirement | Status | Evidence |
 | --- | --- | --- |
-| Modelle für Quizze, Fragen, Antworten, Fortschritt | Erledigt | Quiz, Question, Answer, Progress, SelectedAnswer; initiale Migrationen |
-| REST-API für Erstellen, Anzeigen, Bearbeiten, Löschen | Erledigt | Bestehende Listen-/Detailrouten; CRUD-Tests |
-| Quizze dem angemeldeten Benutzer zuordnen | Erledigt | Owner serverseitig, Listen nutzerbezogen und Objektzugriff mit Eigentümerprüfung (403/404) |
-| Übersicht heutiger Quizze und letzter sieben Tage | Erledigt | period=today/week, lokale Tagesgrenzen getestet |
-| Titel und Beschreibung bearbeiten | Erledigt | PATCH und Admin |
-| YouTube-URL speichern | Erledigt | Validierte kanonische URL im Quiz |
-| Zehn Fragen mit jeweils vier Antworten | Erledigt | Serializer, KI-Schema, Admin-Schutz und DB-Positionsgrenzen |
-| Fortschritt automatisch speichern | Erledigt | Atomare Speicherung nach jedem Klick; Frontend und SQLite im Browser geprüft |
-| Antworten nachträglich ändern | Erledigt | Gespeicherte Auswahl wird ersetzt; Reload und Bewertung bis nach Abschluss geprüft |
-| Prozentwertung und korrekte Lösungen | Erledigt | Prozentwertung nach Abschluss; korrekter Antworttext im Quiz-Response gemäß API-Vertrag stets vorhanden |
-| Quiz erneut spielen | Erledigt | Frontend ruft Replay auf; Datenbank und Reload bestätigen zurückgesetzte Auswahl und Versuchszähler |
+| Quiz, question, answer and progress models | Done | Models, migrations and persistence tests |
+| Create, retrieve, update and delete REST API | Done | CRUD and exact contract tests |
+| Assign quizzes to the authenticated user | Done | Server-assigned owner, own-only lists, foreign-object 403 and missing-object 404 |
+| Today and last-seven-days overview | Done | period=today/week and local calendar-boundary tests |
+| Edit title and description | Done | PATCH and admin validation |
+| Store the YouTube URL | Done | Validated video_url storage and migration preservation |
+| Ten questions with four options each | Done | Schema, content validation, admin safeguards and real generation evidence |
+| Automatically save progress | Done | Atomic selection endpoint; earlier browser autosave and SQLite checks |
+| Change previous answers | Done | Selection replacement, reload and post-completion score updates |
+| Percentage result and correct solutions | Done | Score tests and browser results; correct answer text included in quiz responses as required |
+| Replay quizzes | Done | Reset selections, increment attempt and preserve reset state after reload |
 
-## 3. KI-Integration
+## 3. AI integration
 
-| Anforderung | Status | Nachweis / verbleibende Prüfung |
+| Requirement | Status | Evidence |
 | --- | --- | --- |
-| Nur gültige YouTube-URLs | Erledigt | HTTPS-/Host-/Video-ID-Validierung vor Netzwerkzugriff; tatsächliche Verfügbarkeit erst beim Download |
-| Audio mit yt-dlp und FFmpeg verarbeiten | Erledigt | Echter Download, MP3-Konvertierung und FFprobe-Prüfung erfolgreich |
-| Transkription mit OpenAI Whisper | Erledigt | openai-whisper lokal, small auf RTX 5070 Ti, zwei lokale Aufrufe und echtes YouTube-Audio geprüft |
-| Quizgenerierung mit Gemini Flash | Erledigt | Optimierter einzelner Echtversuch mit 3.8 Flash und LOW: HTTP 200 nach 13,460 Sekunden, zehn gültige Fragen; API 201, SQLite, GET und Browser-Spiel erfolgreich |
-| KI-Antworten validieren, Fragen und Lösungen speichern | Erledigt | Zusätzlich zum Testbestand jetzt echtes Ergebnis: zehn Fragen, 40 Optionen, je eine korrekte Lösung; Quellentreue geprüft, atomar gespeichert und abgerufen |
-| Temporäre Dateien zuverlässig entfernen | Erledigt | Erfolgs-, Transkriptions- und Downloadfehler getestet |
-| API-Keys über Umgebungsvariablen | Erledigt | .env.example ohne Secrets; sichere 503 bei fehlender Einrichtung |
+| Accept only valid YouTube URLs | Done | HTTPS, allowed host, video ID and URL-component validation before download |
+| yt-dlp and FFmpeg audio processing | Done | Earlier real download, MP3 conversion and FFprobe verification |
+| OpenAI Whisper transcription | Done | Local openai-whisper small on CUDA, local audio and real YouTube transcription |
+| Gemini Flash generation | Done | One authorized optimized gemini-3.8-flash request returned HTTP 200 in 13.460 seconds |
+| Validate and store questions and correct answers | Done | Ten distinct questions, forty options, one solution each; real SQLite and API checks |
+| Reliable temporary-file cleanup | Done | Success and failure-path tests; real temporary-directory removal |
+| Environment-based API credentials | Done | Empty public template, no OpenAI API key, safe failure when Gemini is unconfigured |
 
-## 4. Codequalität
+## 4. Code quality
 
-| Anforderung | Status | Nachweis |
+| Requirement | Status | Evidence |
 | --- | --- | --- |
-| Funktionen maximal 14 Zeilen | Erledigt | AST-Prüfung einschließlich Testfunktionen |
-| Jede Funktion erfüllt eine Aufgabe | Erledigt | Getrennte Validierung, Speicherung, Token- und Providerverarbeitung |
-| Python-Funktionen in snake_case | Erledigt | Automatische Namensprüfung |
-| Hilfslogik in services/functions/utils | Erledigt | Services für Auth und Quiz; spezialisierte Validator-/KI-Module |
-| PEP-8 | Erledigt | Ruff: E/F/W/I, 79 Zeichen, Formatprüfung |
-| Aussagekräftige Docstrings | Erledigt | Jede Funktion dokumentiert; AST-Prüfung |
-| Ungenutzten und auskommentierten Code entfernen | Erledigt | Platzhalter ersetzt, ungenutzte leere Module entfernt, Lint-Prüfung |
-| Admin für Quizze und einzelne Fragen | Erledigt | Filter/Suche, einzelne Fragen und Antworten bearbeiten; Antwortwechsel getestet |
+| Functions have at most 14 physical lines | Done | AST check, including tests |
+| Each function has one responsibility | Done | Separate validation, storage, token, transcription and provider helpers reviewed |
+| Python functions use snake_case | Done | AST naming check |
+| Helper logic separated into services/functions/utils | Done | Auth and quiz services plus dedicated validation, generation and transcription modules |
+| PEP-8 | Done | Ruff E/F/W/I, 79-character lines and formatting check |
+| Meaningful docstrings | Done | Source review and AST docstring check |
+| Remove unused and commented-out code | Done | Source review and unused-code lint checks |
+| Admin for quizzes and individual questions | Done | Search/filter, metadata and question/answer editing with regression tests |
 
-## 5. Sicherheit und Dokumentation
+## 5. Security and documentation
 
-| Anforderung | Status | Nachweis / Hinweis |
+| Requirement | Status | Evidence |
 | --- | --- | --- |
-| öffentlichen SECRET_KEY ersetzen und aus Umgebung laden | Erledigt | Kein eingebauter Anwendungsschlüssel, Start ohne eigenen Schlüssel verweigert; alte Deployments müssen den Schlüssel ebenfalls wechseln |
-| DEBUG konfigurierbar | Erledigt | DJANGO_DEBUG, standardmäßig false |
-| Sichere Cookies und CSRF | Erledigt | Secure/HttpOnly/SameSite, CSRF auch bei Login/Registrierung/Refresh/Logout, explizite CORS-Ursprünge |
-| Vollständige README mit Einrichtung, API, Umgebung, FFmpeg | Erledigt | README.md mit Beispielen, Betriebsgrenzen und Quellen |
-| Tests für Registrierung, Login, Logout, Rechte und Quiz | Erledigt | Django-Testsuite plus KI-/Admin-Regressionen |
+| Replace exposed Django key and load from environment | Done | No built-in application key; startup rejects missing or django-insecure-prefixed keys |
+| Configurable DEBUG | Done | DJANGO_DEBUG, false by default |
+| Secure cookies and CSRF protection | Done | Cookie flags, CSRF on all unsafe API methods, explicit credentialed CORS origins |
+| Complete README: setup, API, environment and FFmpeg | Done | English backend-only setup and API guide; optional frontend context clearly separated |
+| Automated registration, login, logout, permissions and quiz tests | Done | 102 backend tests, including contracts, provider transport, admin and migrations |
+| Exclude local secrets, databases and artifacts | Done | Tracked-file/history audit, ignore-rule checks and expanded SQLite sidecar coverage |
 
-## Noch erforderliche externe Abnahme
+## API contract verification
 
-- **Erledigt, lokal:** Nach den früheren 404-/504-Fehlern erfolgreicher,
-  einzeln freigegebener optimierter Gemini-Aufruf; Validierung, Speicherung,
-  API-Abruf und Browser-Spiel bis 100 % bestätigt. Kein Retry oder Folgeaufruf.
-- **Noch nicht eingesehen:** Konkrete RPM-/TPM-/RPD-Projektlimits in AI Studio;
-  Free-Tier-Projektstatus beruht auf Nutzerbestätigung, Modellpreis auf Google-Doku.
-- **Offen:** Zielhosting, HTTPS und produktive Betriebskonfiguration abnehmen.
+The contract source is the user's supplied official Developer Akademie endpoint
+specification and complete JSON example. Automated generation tests simulate
+providers; the earlier authorized real generation also verified POST and GET.
 
-FFmpeg/FFprobe, lokales Whisper und die Fortschrittssynchronisierung zwischen
-Frontend und Backend sind jetzt tatsächlich geprüft. Beide Repositories bleiben
-getrennt. Keine kostenpflichtigen APIs, Commits oder Pushes wurden ausgeführt.
-
-## Lokale Abschlussprüfung
-
-- 102 automatisierte Backend-Tests erfolgreich, einschließlich SDK-Transporttests
-  für genau einen HTTP-Versuch sowie sicherer API-502 ohne Teilquiz bei Provider-504.
-- Ruff-Lint und Formatprüfung erfolgreich.
-- Alle Projektfunktionen erfüllen 14-Zeilen-Grenze, snake_case und Docstrings.
-- Migrationen angewendet; keine fehlenden Modellmigrationen.
-- Abhängigkeiten konsistent; git diff --check ohne Fehler.
-- Django check --deploy mit DEBUG=false, Secure-Cookies und HTTPS-Weiterleitung
-  ohne Warnungen. Dies ersetzt die Prüfung im tatsächlichen Hosting nicht.
-- Lokale .env mit neu erzeugtem Django-Schlüssel erstellt; Gemini-Key wird geladen; Whisper benötigt keinen API-Key.
-  .env, SQLite-Datenbank und virtuelle Umgebung werden von Git ausgeschlossen.
-
-## Abgleich mit dem vorgegebenen API-Vertrag
-
-Quelle ist der vom Auftraggeber bereitgestellte Auszug der offiziellen
-Developer-Akademie-Dokumentation einschließlich des vollständigen JSON-Beispiels.
-Die API-Verträge sind durch zusätzliche automatisierte Tests abgesichert.
-Der Endpunkt zur Quizgenerierung wird mit simuliertem Provider getestet;
-es wurden keine echten kostenpflichtigen KI-Anfragen ausgeführt.
-
-| Endpunkt | Geprüftes Ergebnis | Abweichung / Hinweis |
+| Endpoint | Verified result | Deviation |
 | --- | --- | --- |
-| POST /api/register/ | 201, exakt `{"detail":"User created successfully!"}` | Keine |
-| POST /api/login/ | 200, exakte detail-/user-Struktur, beide HTTP-only-Cookies | Keine; ungültige Login-Daten 401 |
-| POST /api/logout/ | 200, exakte Meldung, beide Cookies entfernt, Tokens serverseitig gesperrt | Keine |
-| POST /api/token/refresh/ | 200, exakt `{"detail":"Token refreshed"}`, neuer Access-Cookie | Keine; zusätzliche Refresh-Rotation bleibt erhalten |
-| POST /api/quizzes/ | 201, Request `url`, exakter Quiz-Response mit zehn Fragen und vier Optionen | Keine; KI-Aufruf simuliert |
-| GET /api/quizzes/ | 200, Array ausschließlich eigener Quizze, exakte Feldmengen | Keine |
-| GET /api/quizzes/{id}/ | 200, exakter Quiz-Response | Keine |
-| PATCH /api/quizzes/{id}/ | 200, aktualisierte Metadaten und updated_at, exakter Quiz-Response | Keine |
-| DELETE /api/quizzes/{id}/ | 204, leerer Body, vollständige kaskadierende Löschung | Keine |
-| GET /api/csrf/ | 200, nutzbarer csrfToken und Cookie | Bestehende Erweiterung |
-| GET /api/quizzes/{id}/progress/ | 200, gespeicherter Versuch, Score und spielbare Antwort-IDs | Bestehende Erweiterung, Fragen nun hier verfügbar |
-| PATCH /api/quizzes/{id}/progress/ | 200, Auswahl speichern/ersetzen und Score aktualisieren | Bestehende Erweiterung |
-| POST /api/quizzes/{id}/replay/ | 200, Auswahlen zurücksetzen und Versuchszähler erhöhen | Bestehende Erweiterung |
+| POST /api/register/ | 201, exactly {"detail":"User created successfully!"} | None |
+| POST /api/login/ | 200, exact detail/user response and HTTP-only token cookies | None; invalid credentials return 401 |
+| POST /api/logout/ | 200, exact prescribed detail, both cookies removed, session revoked | None |
+| POST /api/token/refresh/ | 200, exactly {"detail":"Token refreshed"}, new access cookie | None; refresh rotation retained |
+| POST /api/quizzes/ | 201, request field url, ten questions and four string options each | None |
+| GET /api/quizzes/ | 200, array containing only owned quizzes | None |
+| GET /api/quizzes/{id}/ | 200, exact quiz field set | None |
+| PATCH /api/quizzes/{id}/ | 200, title/description and updated_at updated | None |
+| DELETE /api/quizzes/{id}/ | 204, empty body and cascading deletion | None |
+| GET /api/csrf/ | 200, csrfToken and cookie | Existing supporting endpoint |
+| GET /api/quizzes/{id}/progress/ | 200, saved selections, score and playable answer IDs | Existing extension preserved |
+| PATCH /api/quizzes/{id}/progress/ | 200, save/replace selection and update score | Existing extension preserved |
+| POST /api/quizzes/{id}/replay/ | 200, clear selections and increment attempt | Existing extension preserved |
 
-Quiz-Responses enthalten ausschließlich id, title, description, created_at,
-updated_at, video_url und questions. Fragen enthalten ausschließlich id,
-question_title, question_options, answer, created_at und updated_at.
-question_options enthält vier Strings; answer ist stets der korrekte
-Antworttext. Fortschritt und auswertbare Antwort-IDs bleiben separat über
-die vorhandenen Fortschrittsrouten verfügbar.
+Quiz fields: id, title, description, created_at, updated_at, video_url, questions.
+Question fields: id, question_title, question_options, answer, created_at,
+updated_at. question_options contains exactly four strings; answer is the correct
+answer text. IDs are integers and timestamps are ISO-8601 strings.
 
-400 für ungültige Registrierungs-/Quizdaten, 401 für fehlende Anmeldung oder
-ungültige Login-Daten, 403 für vorhandene fremde Quizze und 404 für fehlende
-Quizze sind getestet. Ein unerwarteter interner Speicherfehler liefert 500
-und hinterlässt keine Teil-Daten. Vorhandene Betriebsfälle 429, 502 und 503
-bleiben zusätzlich erhalten und sind in der README erläutert.
+Tests cover 400 invalid input, 401 unauthenticated/invalid credentials, 403 foreign
+quizzes, 404 missing quizzes, and rollback on unexpected internal storage errors.
+Operational 429, 502 and 503 responses are documented. Migration 0002 preserves
+existing quizzes, questions, answers, progress and selections while updating the
+contract fields.
 
-Migration 0002_api_contract_fields benennt die URL-Spalte ohne Datenverlust um.
-Ein Migrationstest prüft den Erhalt aller zehn Fragen, ihrer Antwortmöglichkeiten,
-des Versuchszählers und der gespeicherten Auswahlen. Zeitstempel bisheriger
-Einträge werden beim Migrieren initialisiert.
+## Final backend review results
 
-Abschluss: 102 Backend-Tests und neun Frontend-Tests erfolgreich.
-Der Vertragstestbestand bleibt erhalten. Die lokale echte Gemini-Abnahme ist
-erfolgreich; die Hosting-Abnahme bleibt offen. Nachweise stehen im Integrationsbericht.
+- All 102 backend tests passed again in 9.369 seconds, without live AI calls.
+- Ruff lint/format, function AST checks, pip check and migration checks passed.
+- Secure Django check --deploy passed with secure process overrides.
+- A backend-only source copy migrated a fresh database, passed Django checks,
+  and verified CSRF, registration, login, HTTP-only cookies and own-quiz listing
+  without a frontend or Gemini key. Temporary files were removed afterward.
+- Ignore rules passed thirteen path checks; no tracked file matches ignore rules.
+- English documentation, local links and README section anchors were checked.
 
+## Evidence boundaries and remaining operational checks
 
-## Aktuelle lokale Integrationsprüfung
+- The 102 backend tests do not require a frontend, live AI calls, or API keys.
+- Nine tests and real Edge browser checks passed in the earlier **locally adapted
+  frontend**. This is supporting evidence, not a frontend submission requirement.
+- The final real Gemini test reused the 3834-character transcript. Audio download
+  and local CUDA transcription were verified separately in earlier real runs.
+- The user confirmed the Gemini project's Free Tier. Public model pricing was
+  checked during that run; model metadata is not independent billing evidence.
+  Numeric project RPM/TPM/RPD limits were not independently inspected.
+- Production hosting, real HTTPS and target-host configuration are not certified
+  by local checks. They do not block the requested backend-only submission.
+- One obsolete hardcoded Django development key remains in old Git history.
+  The application no longer uses it, rejects that insecure prefix, and the current
+  configured credentials were not found in tracked files or Git history. Any old
+  deployment using the historical key must rotate it. History was not rewritten.
 
-Vollständiger Nachweis:
-[local-integration-check.md](local-integration-check.md).
-
-- **Erfolgreich:** FFmpeg/FFprobe 9.0.2 installiert, als Windows-Befehle sowie
-  über FFMPEG_LOCATION erreichbar.
-- **Erfolgreich:** Lokales openai-whisper, Modell small, PyTorch 2.14.1+cu130,
-  echte CUDA-Berechnung und Transkription auf RTX 5070 Ti.
-- **Erfolgreich:** Einmaliges Laden pro Prozess, Lock und Wiederverwendung;
-  Cache-Hit beim zweiten echten lokalen Aufruf nachgewiesen.
-- **Erfolgreich:** YouTube-Audio geladen, konvertiert, lokal transkribiert und
-  temporäre Dateien entfernt; kein OpenAI-API-Key erforderlich.
-- **Erfolgreich:** Vorhandener GEMINI_API_KEY unverändert erkannt und Server
-  neu gestartet; keine geheimen Werte ausgegeben.
-- **Erfolgreich:** Browser-/SQLite-Prüfung für Autosave ohne Weiter-Klick,
-  Neuladen, Antwortänderungen, abgeschlossene Bewertung 90 % -> 100 %,
-  serverseitigen Replay, Fehlerspeicherung und anschließenden Retry.
-- **Erfolgreich:** 102 Backend-Tests sowie neun Frontend-Tests.
-- **Erfolgreich:** LOW, 8192 Tokens, 180 Sekunden Serverdeadline und 190
-  Sekunden HTTPX-Phasenlimits im freigegebenen Echtversuch; genau ein Request.
-- **Erfolgreich:** Gespeichertes Transkript verwendet; zehn Fragen/40 Antworten,
-  API 201/200, SQLite und echtes Browser-Spiel geprüft. 100 % Auswertung,
-  Reload, nachträgliche Antwortänderung auf 90 % sowie Replay bestätigt.
-- **Bereinigt:** Temporäres Testkonto, Tokens und generiertes Testquiz nach
-  SQLite-/Browser-Prüfung entfernt; Ergebnis-JSON lokal im ignorierten Cache.
-
-Audio-, Gemini- und Fortschrittsintegration sind lokal erfolgreich geprüft;
-der aktuelle Gemini-Test verwendete das zuvor erzeugte Transkript. Produktives
-Hosting und HTTPS bleiben offen. Es wurde nichts committet oder gepusht.
+See [the integration report](local-integration-check.md) for measured results and
+[the README](../README.md) for independent backend installation instructions.
