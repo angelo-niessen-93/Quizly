@@ -38,8 +38,8 @@ Integrationen, deren erfolgreicher echter Dienstaufruf noch nicht belegt ist.
 | Nur gültige YouTube-URLs | Erledigt | HTTPS-/Host-/Video-ID-Validierung vor Netzwerkzugriff; tatsächliche Verfügbarkeit erst beim Download |
 | Audio mit yt-dlp und FFmpeg verarbeiten | Erledigt | Echter Download, MP3-Konvertierung und FFprobe-Prüfung erfolgreich |
 | Transkription mit OpenAI Whisper | Erledigt | openai-whisper lokal, small auf RTX 5070 Ti, zwei lokale Aufrufe und echtes YouTube-Audio geprüft |
-| Quizgenerierung mit Gemini Flash | Teilweise erledigt | Letzter Echtversuch mit 3.8 Flash: 504; danach LOW, Ausgabelimit und Deadline lokal optimiert. Neun Offline-Transporttests; neuer Echtversuch noch nicht freigegeben |
-| KI-Antworten validieren, Fragen und Lösungen speichern | Erledigt | JSON-/Inhaltsvalidierung, atomare Speicherung, Rollback-Tests |
+| Quizgenerierung mit Gemini Flash | Erledigt | Optimierter einzelner Echtversuch mit 3.8 Flash und LOW: HTTP 200 nach 13,460 Sekunden, zehn gültige Fragen; API 201, SQLite, GET und Browser-Spiel erfolgreich |
+| KI-Antworten validieren, Fragen und Lösungen speichern | Erledigt | Zusätzlich zum Testbestand jetzt echtes Ergebnis: zehn Fragen, 40 Optionen, je eine korrekte Lösung; Quellentreue geprüft, atomar gespeichert und abgerufen |
 | Temporäre Dateien zuverlässig entfernen | Erledigt | Erfolgs-, Transkriptions- und Downloadfehler getestet |
 | API-Keys über Umgebungsvariablen | Erledigt | .env.example ohne Secrets; sichere 503 bei fehlender Einrichtung |
 
@@ -68,10 +68,11 @@ Integrationen, deren erfolgreicher echter Dienstaufruf noch nicht belegt ist.
 
 ## Noch erforderliche externe Abnahme
 
-- **Teilweise erledigt:** Je ein freigegebener echter Versuch mit 2.5 Flash
-  (404) und danach 3.8 Flash (504 DEADLINE_EXCEEDED). Erfolgreiche Generierung,
-  Speicherung, Abruf und Browser-Spiel bleiben offen; kein automatischer Retry.
-  Konkrete RPM-/TPM-/RPD-Projektlimits sind noch in AI Studio abzulesen.
+- **Erledigt, lokal:** Nach den früheren 404-/504-Fehlern erfolgreicher,
+  einzeln freigegebener optimierter Gemini-Aufruf; Validierung, Speicherung,
+  API-Abruf und Browser-Spiel bis 100 % bestätigt. Kein Retry oder Folgeaufruf.
+- **Noch nicht eingesehen:** Konkrete RPM-/TPM-/RPD-Projektlimits in AI Studio;
+  Free-Tier-Projektstatus beruht auf Nutzerbestätigung, Modellpreis auf Google-Doku.
 - **Offen:** Zielhosting, HTTPS und produktive Betriebskonfiguration abnehmen.
 
 FFmpeg/FFprobe, lokales Whisper und die Fortschrittssynchronisierung zwischen
@@ -134,8 +135,8 @@ des Versuchszählers und der gespeicherten Auswahlen. Zeitstempel bisheriger
 Einträge werden beim Migrieren initialisiert.
 
 Abschluss: 102 Backend-Tests und neun Frontend-Tests erfolgreich.
-Der Vertragstestbestand bleibt erhalten. Die echte Gemini- und Hosting-Abnahme
-bleibt offen; alle aktuellen Nachweise stehen im Integrationsbericht.
+Der Vertragstestbestand bleibt erhalten. Die lokale echte Gemini-Abnahme ist
+erfolgreich; die Hosting-Abnahme bleibt offen. Nachweise stehen im Integrationsbericht.
 
 
 ## Aktuelle lokale Integrationsprüfung
@@ -157,14 +158,14 @@ Vollständiger Nachweis:
   Neuladen, Antwortänderungen, abgeschlossene Bewertung 90 % -> 100 %,
   serverseitigen Replay, Fehlerspeicherung und anschließenden Retry.
 - **Erfolgreich:** 102 Backend-Tests sowie neun Frontend-Tests.
-- **Lokal geprüft:** LOW, 8192 Tokens, 180 Sekunden Serverdeadline und 190
-  Sekunden HTTPX-Phasenlimits; keine Retry-/Continuation-/Redirect-Folgeaufrufe.
-  Offline-Request mit dem vorhandenen Transkript vorbereitet; kein echter Aufruf.
-- **Teilweise erledigt:** Echter Durchlauf bis Gemini; einmaliger Aufruf mit
-  2.5 Flash scheitert mit 404. Der separat freigegebene einzelne Folgeaufruf mit
-  3.8 Flash liefert 504 DEADLINE_EXCEEDED: Deadline expired before operation
-  could complete. Null Fragen erzeugt; kein kostenpflichtiger Fallback.
+- **Erfolgreich:** LOW, 8192 Tokens, 180 Sekunden Serverdeadline und 190
+  Sekunden HTTPX-Phasenlimits im freigegebenen Echtversuch; genau ein Request.
+- **Erfolgreich:** Gespeichertes Transkript verwendet; zehn Fragen/40 Antworten,
+  API 201/200, SQLite und echtes Browser-Spiel geprüft. 100 % Auswertung,
+  Reload, nachträgliche Antwortänderung auf 90 % sowie Replay bestätigt.
+- **Bereinigt:** Temporäres Testkonto, Tokens und generiertes Testquiz nach
+  SQLite-/Browser-Prüfung entfernt; Ergebnis-JSON lokal im ignorierten Cache.
 
-Die Audio- und Fortschrittsintegration ist geprüft. Die Gesamt-Abnahme bleibt
-für eine erfolgreiche Gemini-Generierung samt Browser-Spiel und für das
-produktive Hosting teilweise offen. Es wurde nichts committet oder gepusht.
+Audio-, Gemini- und Fortschrittsintegration sind lokal erfolgreich geprüft;
+der aktuelle Gemini-Test verwendete das zuvor erzeugte Transkript. Produktives
+Hosting und HTTPS bleiben offen. Es wurde nichts committet oder gepusht.

@@ -162,12 +162,15 @@ Google beschränkt die 2.5-Modelle inzwischen auf zuvor aktive Projekte.
 Ein erfolgreicher Metadatenzugriff bestätigt daher keine Generierungsberechtigung.
 
 Standard und lokale Modellkonfiguration verwenden `gemini-3.8-flash`.
-Der separat freigegebene einzelne Folgeversuch bestätigte generateContent über
-die Modell-Metadaten, scheiterte aber nach rund 90 Sekunden mit Provider-504
-`DEADLINE_EXCEEDED`: `Deadline expired before operation could complete.`
-Die Backend-API antwortete sicher mit 502; null Fragen wurden erzeugt.
-Audio und lokales Whisper funktionierten erneut. Ein erfolgreicher
-Generierungsnachweis samt Speicherung und Browser-Spiel bleibt offen.
+Der erste Versuch damit scheiterte nach rund 90 Sekunden mit Provider-504.
+Der anschließend separat freigegebene optimierte Einzelversuch war erfolgreich:
+**Gemini HTTP 200 nach 13,460 Sekunden, API-POST 201 nach 14,391 Sekunden.**
+Das gespeicherte Transkript mit 3834 Zeichen ergab zehn validierte Fragen mit
+40 Optionen und je einer korrekten Lösung. SQLite-Speicherung, exakter
+GET-Response und Spiel im echten Browser bis 100 % wurden erfolgreich geprüft.
+Autosave, Reload, nachträgliche Änderung auf 90 % und Replay bestanden ebenfalls.
+Testkonto, Tokens und Testquiz wurden danach bereinigt; Ergebnis-JSON liegt
+lokal unter `.cache/final-gemini-quiz.json`. Es ist kein dauerhaftes Demoquiz.
 Der API-Key bleibt unverändert. Es gibt keine automatischen Generierungs-Retries
 oder Modell-Fallbacks. Free Tier muss zum Projekt gehören: Dieselbe Modell-ID
 kann in einem Paid-Tier-Projekt Kosten verursachen. Aktive RPM-/TPM-/RPD-Limits
@@ -176,11 +179,12 @@ Werte nicht einsehbar. Das einmalige Testkontingent ist ausgeschöpft.
 
 ### Lokale Optimierung des Gemini-504
 
-Die Optimierung wurde ausschließlich offline geprüft; es wurde kein weiterer
-Gemini-Aufruf ausgeführt. Modell und API-Verträge bleiben unverändert.
+Die Optimierung wurde zuerst offline und danach mit genau einem separat
+freigegebenen Echtversuch erfolgreich geprüft. API-Verträge bleiben unverändert.
 
 - `thinking_level=low`, keine Thought-Ausgabe; zuvor galt der Modellstandard
-  medium. Kurze Aufgaben benötigen damit weniger Reasoning, ein Echtbeleg folgt.
+  medium. Der optimierte Lauf war nach 13,460 Sekunden erfolgreich; der isolierte
+  Einfluss von Thinking, Prompt und Dienstlast wurde nicht getrennt gemessen.
 - Systemprompt von 310 auf 266 Zeichen gekürzt: ausschließlich Fakten aus dem
   Transkript, kurze Texte, zehn Fragen, vier Optionen, eine korrekte Lösung,
   keine Erklärungen. Das vorhandene JSON-Schema und die Inhaltsvalidierung bleiben.
@@ -200,7 +204,7 @@ Der bisherige 504 ist eine Serverantwort, kein nachgewiesener lokaler
 belegt. Ob Reasoning oder Dienstlast die Überschreitung verursachten, bleibt
 offen. Das Transkript mit 3834 Zeichen ist kein Beleg für einen zu großen Prompt.
 
-Den nächsten Request mit dem gespeicherten Transkript **ohne Netzwerkzugriff**
+Einen Request mit dem gespeicherten Transkript **ohne Netzwerkzugriff**
 vorbereiten:
 
 ```powershell
@@ -245,7 +249,7 @@ Die Datei ist von Git ausgeschlossen. `.env.example` enthält keine Zugangsdaten
 | `CSRF_TRUSTED_ORIGINS` | Explizite Frontend-Ursprünge mit Schema und Port; standardmäßig leer |
 | `CORS_ALLOWED_ORIGINS` | Explizite Frontend-Ursprünge; standardmäßig leer |
 | `GEMINI_API_KEY` | Eigener Gemini-API-Key; standardmäßig leer |
-| `GEMINI_MODEL` | `gemini-3.8-flash`; Tarif im eigenen Projekt prüfen; einmaliger Echtversuch lieferte Provider-504, erfolgreicher Abschluss noch offen |
+| `GEMINI_MODEL` | `gemini-3.8-flash`; optimierter Einzelversuch erfolgreich; Tarif im eigenen Projekt weiterhin prüfen |
 | `GEMINI_TIMEOUT_SECONDS` | `180`, positive angeforderte Serverdeadline; HTTPX erhält zehn Sekunden zusätzliche Reserve |
 | `GEMINI_MAX_OUTPUT_TOKENS` | `8192`, positive Tokenobergrenze einschließlich Thinking; unvollständige Inhalte werden verworfen |
 | `WHISPER_MODEL` | `small`, lokales Whisper-Modell |
@@ -598,10 +602,10 @@ Entwicklungsserver ist kein Produktionsserver.
 
 Die vollständige Zuordnung aller DoD-Punkte mit offenen externen Prüfungen steht
 in [docs/definition-of-done.md](docs/definition-of-done.md).
-Der echte YouTube -> FFmpeg -> Whisper -> Gemini-Durchlauf wurde gestartet,
-scheiterte beim alten Modell mit 404 und im freigegebenen einzelnen Folgeversuch
-mit 3.8 Flash an Provider-504 DEADLINE_EXCEEDED; null Fragen wurden erzeugt.
-Die erfolgreiche vollständige Generierung bleibt offen.
+Der Audiopfad YouTube -> FFmpeg -> lokales Whisper ist durch echte frühere
+Läufe geprüft. Der finale optimierte Gemini-Test verwendete dieses gespeicherte
+Transkript und erzeugte erfolgreich zehn Fragen. Validierung, SQLite, API-Abruf
+und Browser-Spiel sind bestätigt; produktives Hosting und HTTPS bleiben offen.
 Das offizielle Frontend liegt separat in D:\DEVAkademie\Projekte\Quizly-Frontend
 und wurde gemeinsam mit diesem Backend lokal im Browser geprüft.
 Das Frontend synchronisiert Antworten, Wiederaufnahme und Replay jetzt mit dem Backend.
@@ -634,12 +638,11 @@ Ergebnissen, Secret-Status ohne Werte und allen Blockern findest du in
 [docs/local-integration-check.md](docs/local-integration-check.md).
 
 Der echte YouTube-Audiodownload, FFmpeg, FFprobe und lokales GPU-Whisper sind
-geprüft. Der erste Free-Tier-Versuch lieferte Gemini 404; der separat freigegebene
-einzelne Folgeversuch mit 3.8 Flash scheiterte mit 504 DEADLINE_EXCEEDED.
-Der nächste Durchlauf benötigt eine neue Freigabe für einen weiteren Versuch;
-es erfolgten keine kostenpflichtigen Aufrufe und kein automatischer Retry.
-Die manuelle Quiz-Erstellung und Speicherung sowie die Frontend-Synchronisierung
-von Auswahlen, Reload, Antwortänderung und Replay wurden real geprüft.
+geprüft. Nach früheren 404-/504-Fehlern ist der einzeln freigegebene optimierte
+Free-Tier-Versuch mit 3.8 Flash erfolgreich: zehn Fragen, 40 Optionen, Speicherung,
+GET und echtes Browser-Spiel. Kein Retry, keine automatische Fortsetzung und
+keine kostenpflichtigen Funktionen. Jeder weitere echte Aufruf benötigt eine
+neue Freigabe. Testkonto und Testquiz wurden nach erfolgreicher Prüfung entfernt.
 
 Frontend-Regressionen im getrennten Frontend-Ordner ausführen:
 

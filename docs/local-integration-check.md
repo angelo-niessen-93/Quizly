@@ -1,7 +1,88 @@
 # Lokale Integrationsprüfung – aktueller Abschluss
 
-Stand: 15.10.2026, nach lokaler Optimierung ohne weiteren echten API-Aufruf.
+Stand: 15.10.2026, nach erfolgreichem freigegebenem Echtversuch mit optimiertem Gemini.
 Keine kostenpflichtigen Gemini- oder OpenAI-API-Aufrufe wurden ausgeführt.
+
+## Finaler optimierter Echtversuch: erfolgreich
+
+Der Benutzer gab einen weiteren einzelnen Versuch innerhalb des bestehenden
+Free-Tier-Projekts frei. Die aktuelle öffentliche Preisliste bestätigt kostenlosen
+Standard-Textinput/-output für gemini-3.8-flash. Vor dem Versuch war die lesende
+Modellabfrage mit dem vorhandenen unveränderten Key erfolgreich und bestätigte
+generateContent. Der Projekttarif beruht auf der bestehenden Nutzerbestätigung;
+Modell-Metadaten liefern keinen unabhängigen Abrechnungsnachweis. Keine Billing-
+Einstellungen wurden verändert. Keine kostenpflichtigen Tools oder Funktionen.
+
+| Prüfung | Tatsächliches Ergebnis |
+| --- | --- |
+| Eingang | Vorhandenes Transkript unverändert wiederverwendet, 3834 Zeichen |
+| Transkript-SHA256 | 950ea93ce0671759c9a83c3b8d2c35f2b29d04c89a9dd087f8f65d35c28f3089 |
+| Modell | gemini-3.8-flash; identische modelVersion in echter Antwort |
+| Konfiguration | LOW, keine Thought-Ausgabe, maximal 8192 Tokens, Serverdeadline 180 Sekunden, HTTPX-Phasenlimits 190 Sekunden |
+| Wiederholungen / Fortsetzungen | Genau ein beobachteter HTTP-Generierungsrequest; attempts=1, Continuation, Function Calling und Redirects deaktiviert |
+| Gemini | HTTP 200 nach 13,460 Sekunden; finishReason STOP |
+| Gesamter Backend-POST | HTTP 201 nach 14,391 Sekunden |
+| Titel | The Science of Vaccines |
+| JSON und Lösungen | Zehn unterschiedliche Fragen, je vier unterschiedliche Textoptionen und genau eine korrekte Lösung; vorhandene Inhaltsvalidierung bestanden |
+| Quellentreue | Alle zehn Fragen und richtigen Lösungen gegen das gespeicherte Transkript geprüft |
+| SQLite | Zehn Fragen, 40 Antworten, je Frage genau ein is_correct; initialer Fortschritt angelegt |
+| Response-Vertrag | Exakte Quiz-/Fragenfelder, Integer-IDs, ISO-Zeitstempel, Antwort als Text und vier Optionen je Frage bestätigt |
+| GET-Response | HTTP 200, identischer Quizinhalt zum POST-Response |
+| Frontend im echten Edge-Browser | Anmeldung und alle zehn Fragen erfolgreich, UI 100,0 %, Backend 100,0 % |
+| Autosave / Reload | Nach drei Auswahlen Neuladen: Fortschritt erhalten, vierte Frage geöffnet |
+| Persistierte Auswertung | Zehn gespeicherte Auswahlen direkt in SQLite bestätigt |
+| Nachträgliche Änderung | Nach Abschluss erste Antwort geändert; gespeicherte Bewertung 90 % |
+| Wiederholung / Reload | Replay: attempt=2, completed=false, null Auswahlen; Zustand nach Neuladen bestätigt |
+| Testdaten | Testkonto, Tokens und Testquiz nach Prüfung entfernt; keine dauerhafte Demo-Anmeldung hinterlassen |
+| Automatisierte Tests | 102 Backend-Tests und neun Frontend-Tests erfolgreich |
+
+### Tatsächlich geprüfte API-Endpunkte
+
+| Endpunkt | Ergebnis im echten Lauf | Abweichung |
+| --- | --- | --- |
+| GET /api/csrf/ | 200; CSRF für Requests und Browser verfügbar | Keine |
+| POST /api/register/ | 201 | Keine |
+| POST /api/login/ | 200; Access-/Refresh-Cookies HTTP-only | Keine |
+| POST /api/quizzes/ | 201; Request mit ausschließlich url | Audiopfad im temporären Prüfserver durch gespeichertes Transkript ersetzt, wie beauftragt |
+| GET /api/quizzes/{id}/ | 200; vollständiger Vertragsvergleich bestanden | Keine |
+| GET /api/quizzes/{id}/progress/ | 200; gespeicherte Auswahlen und Bewertung korrekt | Keine |
+| PATCH /api/quizzes/{id}/progress/ | 200; Autosave und nachträgliche Änderung im Browser | Keine |
+| POST /api/quizzes/{id}/replay/ | 200; Zustand serverseitig zurückgesetzt | Keine |
+
+Die temporäre Einbindung ersetzte ausschließlich die erneute Audio-/Whisper-
+Verarbeitung durch das vorhandene Transkript für dieselbe Video-URL. Es wurden
+keine KI-Inhalte simuliert: generate_questions, SDK, Provideraufruf, Validierung,
+create_quiz, save_quiz, Response-Serializer und REST-/Browserzugriffe waren echt.
+Der Prüfserver wird danach durch den normalen Django-Server ersetzt. Es gibt
+keinen neuen produktiven Transkript-Cache und keine geänderten API-Verträge.
+Der Audiopfad ist durch die unten dokumentierten vorherigen echten Läufe belegt.
+
+Google meldete 805 Prompt-Tokens, 1128 Kandidaten-Tokens und 1933 Tokens gesamt.
+serviceTier=standard bezeichnet die Inferenzklasse, nicht den Billing-Tarif.
+Ein konkreter Thinking-Tokenzähler wurde in dieser Antwort nicht mitgeliefert.
+Die optimierte Konfiguration funktioniert in diesem Lauf; welchen Anteil LOW,
+Prompt oder Dienstlast an der Verbesserung hatten, ist nicht isoliert bewiesen.
+
+Archivierte lokale Nachweise, jeweils von Git ausgeschlossen:
+.cache/final-gemini-stages.jsonl, .cache/final-gemini-result.json,
+.cache/final-gemini-provider-response.json und .cache/final-gemini-quiz.json.
+Quiz-ID 4 war eine temporäre Test-ID und ist nach Bereinigung nicht abrufbar.
+Backend und Frontend bleiben strikt getrennte Repositories; Frontend unverändert.
+Kein weiterer Generierungsaufruf, kein Commit und kein Push.
+
+**Lokale KI-Abnahme erfolgreich.** Offen bleiben das produktive Hosting/HTTPS
+und die Einsicht in konkrete RPM-/TPM-/RPD-Projektlimits in Google AI Studio.
+Jeder weitere echte Generierungsaufruf benötigt eine neue Freigabe.
+
+Quellen (15.10.2026):
+[Free-Tier-Preise](https://ai.google.dev/gemini-api/docs/pricing),
+[Abrechnung](https://ai.google.dev/gemini-api/docs/billing).
+
+## Frühere lokale Optimierung und fehlgeschlagene Versuche
+
+Die folgenden Abschnitte dokumentieren den vorherigen Stand. Aussagen über
+damals noch fehlende Freigaben oder erfolgreiche Generierung werden durch
+das aktuelle Ergebnis oben ersetzt.
 
 ## Gemini-504: lokale Analyse und vorbereitete Optimierung
 
