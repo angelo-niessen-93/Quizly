@@ -1,28 +1,67 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+"""Public authentication endpoints protected against CSRF."""
+
+from django.middleware.csrf import get_token, rotate_token
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    permission_classes,
+)
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework import status
+
+from .authentication import CsrfOnlyAuthentication
+from .serializers import LoginSerializer, RegisterSerializer
+from .services import (
+    revoke_session,
+    rotate_session,
+    save_registration,
+    session_response,
+)
+
+
+@api_view(['GET'])
+@authentication_classes([CsrfOnlyAuthentication])
+@permission_classes([AllowAny])
+def csrf(request):
+    """Bootstrap a CSRF cookie and return the masked header token."""
+    return Response({'csrfToken': get_token(request)})
 
 
 @api_view(['POST'])
+@authentication_classes([CsrfOnlyAuthentication])
 @permission_classes([AllowAny])
 def register(request):
-    return Response({'detail': 'Register endpoint prepared.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    """Register validated credentials without returning any JWT."""
+    serializer = RegisterSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    save_registration(serializer)
+    return Response(serializer.data, status=201)
 
 
 @api_view(['POST'])
+@authentication_classes([CsrfOnlyAuthentication])
 @permission_classes([AllowAny])
 def login(request):
-    return Response({'detail': 'Login endpoint prepared.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    """Authenticate credentials and set both HTTP-only token cookies."""
+    serializer = LoginSerializer(
+        data=request.data, context={'request': request}
+    )
+    serializer.is_valid(raise_exception=True)
+    rotate_token(request)
+    return session_response(serializer.validated_data['user'])
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@authentication_classes([CsrfOnlyAuthentication])
+@permission_classes([AllowAny])
 def logout(request):
-    return Response({'detail': 'Logout endpoint prepared.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    """Allow logout even after the access token expires."""
+    return revoke_session(request)
 
 
 @api_view(['POST'])
+@authentication_classes([CsrfOnlyAuthentication])
 @permission_classes([AllowAny])
 def token_refresh(request):
-    return Response({'detail': 'Token refresh endpoint prepared.'}, status=status.HTTP_501_NOT_IMPLEMENTED)
+    """Rotate tokens using only the refresh cookie."""
+    return rotate_session(request)

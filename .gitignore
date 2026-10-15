@@ -37,3 +37,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+
+# Generated static assets and linter cache
+staticfiles/
+.ruff_cache/

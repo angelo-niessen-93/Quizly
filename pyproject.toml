@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 79
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = []
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.lint.per-file-ignores]
+"*/migrations/*.py" = ["E501"]
+"quizly/test_settings.py" = ["F403", "F405", "E402"]
+
+[tool.ruff.format]
+quote-style = "single"
+skip-magic-trailing-comma = true
