@@ -26,6 +26,12 @@ media/*
 .env.*
 !.env.example
 
+# Private credentials and local tooling configuration
+.aws/
+.codex/
+*.pem
+*.key
+
 # Test and coverage
 .coverage
 .coverage.*

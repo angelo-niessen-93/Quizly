@@ -1,408 +1,165 @@
 # Quizly
 
-**Turn YouTube videos into personal, playable quizzes.**
+Turn YouTube videos into playable quizzes with Django REST Framework, local
+Whisper transcription, and Google Gemini. This repository contains only the
+backend. The [official Developer Akademie frontend](https://github.com/Developer-Akademie-Backendkurs/project.Quizly)
+is a separate project.
 
-This repository contains **only the Quizly Django backend** submitted to
-Developer Akademie. The supplied frontend is not part of this submission. No
-frontend fork or separate frontend repository owned by the backend author is
-required.
+## Quick Start
 
-Quizly is a Django REST backend built as a Developer Akademie final project. It
-helps learners check what they understood from a video: submit a YouTube URL,
-generate ten multiple-choice questions, play the quiz, and review the answers.
-Progress is saved automatically, so learners can return later or change an answer.
+Run these commands in PowerShell with Python 3.12+ and Git installed.
 
-Audio is transcribed **locally with open-source OpenAI Whisper**. The transcript
-is then sent to Google Gemini Flash for structured quiz generation. Quizly does
-not use the paid OpenAI transcription API and does not require an OpenAI API key.
+1. Clone the backend:
+   ```powershell
+   git clone https://github.com/angelo-niessen-93/Quizly.git
+   cd Quizly
+   ```
+2. Create and activate a virtual environment:
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
+3. Install the standard runtime dependencies:
+   ```powershell
+   python -m pip install -r requirements.txt
+   ```
+4. Create the local configuration and generate a private signing key:
+   ```powershell
+   Copy-Item .env.example .env
+   python -c "import secrets; from dotenv import set_key; set_key('.env', 'DJANGO_SECRET_KEY', secrets.token_urlsafe(64))"
+   ```
+   Edit `.env` and set `GEMINI_API_KEY` for quiz generation. Registration and
+   login work without a Gemini key. For the original frontend, keep
+   `LOCAL_FRONTEND_CSRF_COMPATIBILITY=true` from the template. This enables
+   tokenless requests only from explicitly trusted local frontend origins.
+   Keep `DJANGO_DEBUG=true`, `COOKIE_SECURE=false`, and
+   `SECURE_SSL_REDIRECT=false` for local HTTP; use `127.0.0.1` for both servers.
+   Production must use CSRF tokens and disable this compatibility setting.
+5. Apply migrations:
+   ```powershell
+   python manage.py migrate
+   ```
+6. Start Django:
+   ```powershell
+   python manage.py runserver 127.0.0.1:8000
+   ```
 
-[Backend repository](https://github.com/angelo-niessen-93/Quizly) ·
-[Official Developer Akademie frontend](https://github.com/Developer-Akademie-Backendkurs/project.Quizly)
+Keep this terminal open. [The CSRF endpoint](http://127.0.0.1:8000/api/csrf/)
+returns JSON; `/api/` itself is not a homepage. These steps assume a fresh clone;
+do not overwrite an existing `.env` or regenerate an existing signing key.
 
-## Table of contents
+On Linux/macOS use `python3 -m venv .venv`, `source .venv/bin/activate`, and
+`cp .env.example .env`; the remaining Python commands are the same.
+If PowerShell blocks activation, invoke `.\.venv\Scripts\python.exe` directly.
 
-- [Features](#features)
-- [Technology stack](#technology-stack)
-- [Architecture](#architecture)
-- [Frontend repository and integration](#frontend-repository-and-integration)
-- [Installation and setup](#installation-and-setup)
-- [Environment variables](#environment-variables)
-- [API documentation](#api-documentation)
-- [Authentication and security](#authentication-and-security)
-- [Django administration](#django-administration)
-- [Testing and verified results](#testing-and-verified-results)
-- [Troubleshooting](#troubleshooting)
-- [Security and deployment](#security-and-deployment)
-- [Additional documentation](#additional-documentation)
-- [Credits and acknowledgements](#credits-and-acknowledgements)
+## System prerequisites
 
-## Features
+- Python 3.12 or newer and Git (`python --version`, `git --version`).
+- **FFmpeg and FFprobe** for video processing. On Windows:
+  ```powershell
+  winget install --id Gyan.FFmpeg -e
+  ```
+  Open a new terminal after installing and reactivate the virtual environment.
+  Verify with `ffmpeg -version` and `ffprobe -version`.
+  On Ubuntu/Debian use `sudo apt install ffmpeg`; on macOS use `brew install ffmpeg`.
+  If the executables are outside `PATH`, set `FFMPEG_LOCATION` to their directory.
+- Internet access and a [Gemini API key](https://aistudio.google.com/api-keys)
+  for generation. The first Whisper transcription downloads model weights.
 
-- Register with username, email, password, and password confirmation; validate
-  passwords and reject duplicate emails regardless of letter case.
-- Sign in with JWT access and refresh tokens stored exclusively in HTTP-only
-  cookies. Refresh rotates the session; logout clears cookies and revokes it.
-- Process supported public YouTube video URLs with yt-dlp, FFmpeg, local Whisper,
-  and Gemini Flash.
-- Validate exactly **ten distinct questions**, **four distinct options per
-  question**, and **one correct solution** before storing a quiz.
-- List, open, rename, describe, and delete your own quizzes; filter by today or
-  the last seven calendar days.
-- Save every answer selection, resume after reloading, and replace previous
-  answers, including after completing a quiz.
-- Calculate a percentage score, review correct solutions, and replay the same
-  questions with saved selections reset.
-- Manage quizzes and individual questions through Django admin.
-- Use a separate responsive HTML/CSS/JavaScript frontend for authentication,
-  the quiz library, quiz play, and results.
+## Run the official frontend
 
-Frontend behavior was verified with the locally integrated copy described below.
-Frontend files are not bundled with this backend.
+In a second terminal, start from the directory **containing** the backend folder:
 
-## Technology stack
+```powershell
+git clone https://github.com/Developer-Akademie-Backendkurs/project.Quizly.git Quizly-Frontend
+python -m http.server 5500 --bind 127.0.0.1 --directory Quizly-Frontend
+```
 
-| Area | Technologies |
-| --- | --- |
-| Backend | Python, Django 6.1, Django REST Framework 3.18.0, SQLite |
-| Authentication | Simple JWT 5.5.1 with token blacklist, Django CSRF, django-cors-headers 4.9.0 |
-| Configuration | python-dotenv and environment-based Django settings |
-| Audio and AI | yt-dlp, FFmpeg/FFprobe, openai-whisper 20250625, PyTorch, optional NVIDIA CUDA, Google GenAI SDK and Gemini Flash |
-| Separate frontend | HTML5, CSS with media queries, vanilla JavaScript, Fetch API; no application framework or build step |
-| Tests and quality | Django/DRF tests, unittest mocks, HTTPX MockTransport, Ruff, custom AST checks; Node.js built-in frontend tests |
+Open **http://127.0.0.1:5500/** and register, then log in. No frontend source
+changes or Node.js installation are required. Keep frontend and backend in
+separate sibling folders. Do not open pages using `file://`.
 
-Dependency pins and ranges are in [requirements.txt](requirements.txt) and
-[requirements-dev.txt](requirements-dev.txt). The verified Windows environment
-used Python 3.14.2, FFmpeg/FFprobe 9.0.2, Google GenAI 2.31.0, and Node.js 24.16.0.
-GPU transcription was verified with an RTX 5070 Ti and PyTorch 2.14.1+cu130.
-CUDA is optional; automatic device selection falls back to CPU.
+The original frontend targets `http://127.0.0.1:8000/api/`. Use `127.0.0.1`
+for both servers: `localhost` and `127.0.0.1` are different cookie sites.
+Both port-5500 origins are listed in the environment template, but opening the
+original frontend on `localhost` while its API uses `127.0.0.1` can prevent
+SameSite cookies from accompanying login follow-up requests.
+
+## Configuration
+
+[.env.example](.env.example) is the complete configuration template. Django
+loads `.env` beside `manage.py`; exported variables take precedence. Set a private
+`DJANGO_SECRET_KEY` and, for generation, `GEMINI_API_KEY`. Never commit `.env`.
+No paid OpenAI API or OpenAI key is required; Whisper runs locally.
+
+The template is for local HTTP development. Exact frontend origins include the
+scheme and port; allowed hosts contain hostnames only. Restart Django after
+configuration changes. See the template for audio, Gemini, cookie, and origin
+settings instead of maintaining a second variable reference here.
+
+For an existing local HTTP installation, add
+`LOCAL_FRONTEND_CSRF_COMPATIBILITY=true` to `.env` and restart Django to use the
+unchanged official frontend. Fresh installations include this setting through
+the template. Its security restrictions are described under
+[CSRF and browser requests](#csrf-and-browser-requests).
+
+## Usage
+
+Register an account in the frontend, log in, and submit a supported public
+YouTube video URL to generate a ten-question quiz. Open quizzes from your
+library to play, review answers, or edit their title and description.
+
+The API also supports saving answer selections and replaying quizzes. Clients
+must integrate the progress and replay endpoints to persist play across reloads;
+the unchanged official frontend does not use those endpoints.
 
 ## Architecture
 
-**YouTube URL → yt-dlp → FFmpeg → local Whisper → Gemini Flash → validated
-Django REST content → SQLite → frontend.**
+The separate browser frontend communicates with Django REST Framework through
+JSON requests and HTTP-only JWT cookies. Django stores users, quiz content, and
+answer progress in SQLite and restricts quiz access to the owner.
 
-```mermaid
-flowchart TD
-    Browser[Separate browser frontend] -->|REST requests and cookies| API[Django REST API]
-    API --> URL[Validate YouTube URL and metadata]
-    URL --> Download[yt-dlp downloads audio]
-    Download --> Audio[FFmpeg converts audio to MP3]
-    Audio --> Whisper[Local Whisper small on CUDA or CPU]
-    Whisper -->|Transcript text only| Gemini[Gemini Flash structured JSON]
-    Gemini --> Validate[Validate questions and correct answers]
-    Validate --> DB[(SQLite: quizzes and progress)]
-    DB --> API
-    API -->|Quiz, progress and results| Browser
-    Browser -->|Save selection or replay| API
-```
-
-Generation is synchronous: POST waits for processing, transcription, generation,
-validation, and storage. There is no background queue or job-status endpoint.
-The first Whisper request also downloads model weights.
-
-Quiz creation is atomic. Temporary audio is removed on success and failure; the
-normal pipeline does not permanently store audio or transcripts. Whisper weights
-remain cached, and the loaded model is reused once per process. A lock serializes
-model loading and transcription within that process.
-
-The models are `User`, `Quiz`, `Question`, `Answer`, `Progress`, and
-`SelectedAnswer`. Each quiz has an owner and one current progress record.
-Selections are unique per question in that record. Replay resets the current
-state; a history of previous attempts is not retained.
+Quiz generation follows this pipeline:
 
 ```text
-Quizly/
-|-- apps/
-|   |-- accounts/       # Custom user, cookie JWT authentication, CSRF, token services
-|   `-- quizzes/        # Models, API, generation, audio, validation, admin, tests
-|-- quizly/             # Settings, root URLs, WSGI/ASGI, isolated test settings
-|-- scripts/            # Quality check and offline Gemini request preparation
-|-- docs/               # DoD mapping and integration evidence
-|-- .env.example        # Public configuration template without credentials
-|-- manage.py
-|-- requirements.txt
-`-- requirements-dev.txt
+YouTube URL -> yt-dlp -> FFmpeg -> local Whisper -> Gemini -> validation -> SQLite
 ```
 
-## Frontend repository and integration
+Whisper transcribes audio locally; only the transcript is sent to Gemini to
+generate structured questions. The backend validates ten distinct questions,
+four distinct options per question, and one correct answer before saving.
+Generation is synchronous, so the request waits for the complete pipeline.
 
-The frontend is supplied by **Developer Akademie**:
+| Directory | Responsibility |
+| --- | --- |
+| `apps/accounts/` | Users, authentication, cookie sessions, and API CSRF checks |
+| `apps/quizzes/` | Quiz models, generation, progress, API views, and tests |
+| `quizly/` | Django settings, root URLs, and server entry points |
+| `scripts/` | Quality checks and offline provider diagnostics |
 
-**[Developer-Akademie-Backendkurs/project.Quizly](https://github.com/Developer-Akademie-Backendkurs/project.Quizly)**
+## Optional: NVIDIA GPU Acceleration
 
-The frontend is provided by Developer Akademie and is excluded from this backend
-submission. Frontend and backend communicate exclusively through the REST API;
-there is no shared code or database. Backend installation, API use, automated
-tests, and submission do not require the frontend.
+Whisper supports CPU execution. `WHISPER_DEVICE=auto` selects CUDA when available
+and otherwise CPU; set `WHISPER_DEVICE=cpu` to explicitly use CPU. CPU inference
+uses full precision and can be substantially slower. A GPU is optional.
 
-For optional browser testing, keep a local frontend copy outside the backend
-repository and retain its license and attribution. No author-owned frontend
-repository or frontend publication is required.
+NVIDIA acceleration can speed up local transcription. The previously tested
+**RTX 5070 Ti** setup used `torch==2.14.1+cu130`; this is hardware-specific,
+not part of the standard installation. Users without an NVIDIA GPU should
+**not execute NVIDIA-specific installation commands**.
 
-Use sibling folders, never a frontend folder inside the backend:
-
-```text
-quizly-workspace/
-|-- Quizly/             # This backend repository
-`-- Quizly-Frontend/    # Separate frontend repository
-```
-
-The verified local frontend copy includes these integration changes:
-
-- `shared/js/config.js`: API base URL `http://127.0.0.1:8000/api/`.
-- `shared/js/auth.js`: credentialed requests, CSRF bootstrap/header handling,
-  and refresh on HTTP 401 rather than on CSRF/ownership 403 responses.
-- `shared/js/progress.js`: a `QuizProgress` controller that maps option text to
-  answer IDs and serializes progress writes.
-- `shared/js/quiz.js` and `pages/quiz.html`: load saved progress, autosave every
-  selection, restore selections, handle failed saves, and invoke replay.
-- `tests/progress.test.cjs`: nine regression tests for this integration.
-
-**Integration evidence:** browser tests used a locally adapted copy of the
-provided frontend, not the unchanged official upstream version. The upstream
-snapshot does not include the local CSRF/progress additions listed above, so a
-fresh upstream clone may behave differently. This is context for reproducing the
-browser tests, not a backend installation or submission prerequisite. No frontend
-code or patch is included here. Keep backend CSRF protection enabled.
-
-## Installation and setup
-
-### 1. Prerequisites
-
-For Windows, install:
-
-- [Python](https://www.python.org/downloads/) with `python` available in PowerShell.
-  Python 3.14 is tested; Django 6.1 requires Python 3.12 or newer.
-- [Git](https://git-scm.com/downloads).
-- FFmpeg and FFprobe, installed in step 4.
-- Internet access for YouTube, model weights, and Gemini.
-- A Gemini API key for automatic generation; check its project tier and quotas.
-- Optionally, a compatible NVIDIA driver and CUDA-enabled PyTorch for GPU use.
-
-Check `python --version` and `git --version`. The commands below assume a new
-installation. Reuse existing folders and configuration instead of overwriting them.
-
-### 2. Clone the backend
+For a compatible NVIDIA GPU, install a suitable driver, use the
+[official PyTorch selector](https://pytorch.org/get-started/locally/) to choose a
+supported CUDA wheel for your OS/Python/GPU, and install it in the active backend
+virtual environment. For the recorded RTX configuration only:
 
 ```powershell
-git clone https://github.com/angelo-niessen-93/Quizly.git Quizly
-cd Quizly
+python -m pip install --upgrade torch==2.14.1+cu130 --index-url https://download.pytorch.org/whl/cu130
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 ```
 
-All required installation steps below run inside this backend repository.
-The Developer Akademie frontend is optional and must remain in a separate folder.
-
-### 3. Create a virtual environment and install dependencies
-
-From the backend folder:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-```
-
-All subsequent Python commands assume the backend virtual environment is active
-unless stated otherwise.
-
-If PowerShell blocks activation, use the session-only option
-`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`, then activate again.
-Alternatively, invoke `.\.venv\Scripts\python.exe` directly.
-
-For the verified RTX 5070 Ti environment, this CUDA wheel was installed **before**
-the requirements installation:
-
-```powershell
-python -m pip install torch==2.14.1+cu130 --index-url https://download.pytorch.org/whl/cu130
-```
-
-For other hardware, use the [official PyTorch selector](https://pytorch.org/get-started/locally/).
-The recorded wheel is a tested example, not a requirement for every machine.
-Installing a CUDA toolkit alone does not make CPU-only PyTorch GPU-enabled.
-
-Now install the project dependencies, whether using CPU or CUDA:
-
-```powershell
-python -m pip install -r requirements-dev.txt
-```
-
-`requirements-dev.txt` includes runtime dependencies and Ruff. For an installation
-without development tools, use `requirements.txt` instead. A compatible CUDA
-wheel installed above satisfies the project's PyTorch dependency.
-
-Check the runtime without loading Whisper or contacting an AI service:
-
-```powershell
-python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('CUDA runtime:', torch.version.cuda)"
-```
-
-### 4. Install FFmpeg and verify FFprobe
-
-On Windows with WinGet:
-
-```powershell
-winget install --id Gyan.FFmpeg -e
-```
-
-Open a new terminal afterward, return to the backend folder, and reactivate the
-virtual environment. Verify both executables:
-
-```powershell
-ffmpeg -version
-ffprobe -version
-```
-
-An FFmpeg Python package does not replace these programs. If they are not on
-`PATH`, set `FFMPEG_LOCATION` in `.env` to their shared directory. Quizly adds
-that directory to its process `PATH` so local Whisper can find FFmpeg too.
-
-### 5. Configure environment variables and Gemini
-
-Copy the template only if `.env` does not already exist:
-
-```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-```
-
-For a **new installation**, generate a private Django secret directly into `.env`
-without displaying it:
-
-```powershell
-python -c "import secrets; from dotenv import set_key; set_key('.env', 'DJANGO_SECRET_KEY', secrets.token_urlsafe(64))"
-```
-
-This replaces that variable. Skip it when reusing a valid installation. Rotating
-the signing key invalidates existing signed sessions and JWTs. Never reuse an old
-publicly exposed key or a value starting with `django-insecure-`.
-
-Edit `.env` and enter your own `GEMINI_API_KEY` privately. Obtain it from
-[Google AI Studio](https://aistudio.google.com/api-keys), then check the project's
-billing tier, model availability, and rate limits. The template intentionally
-leaves credentials empty.
-
-The local template selects Gemini `gemini-3.8-flash`, Whisper `small`, HTTP cookie
-settings, and the frontend origin on port 5500. Do not commit `.env`. Restart
-Django after changes; exported process variables override file values.
-
-Check key presence without displaying it or calling Google:
-
-```powershell
-python manage.py shell -c "from django.conf import settings; print('Gemini configured:', bool(settings.GEMINI_API_KEY.strip()))"
-```
-
-### 6. Apply migrations and start Django
-
-```powershell
-python manage.py migrate
-python manage.py check
-python manage.py createsuperuser
-python manage.py runserver 127.0.0.1:8000
-```
-
-The superuser is optional unless you need admin access. Keep the server terminal
-open. Check [the CSRF endpoint](http://127.0.0.1:8000/api/csrf/) for JSON;
-`/api/` itself is a prefix, not a homepage or health endpoint. Admin is available
-at [the admin URL](http://127.0.0.1:8000/admin/).
-
-Back up existing databases before migrations; do not delete data to fix errors.
-Migration `0002_api_contract_fields` preserves content while renaming the stored
-URL field and adding timestamps. An older database using Django's standard user
-model needs a separate migration plan.
-
-### 7. Verify the backend independently
-
-With Django running, use a second terminal:
-
-```powershell
-curl.exe http://127.0.0.1:8000/api/csrf/
-```
-
-Expect HTTP 200 and a JSON object containing `csrfToken`. No frontend, Node.js,
-Gemini request, or model download is needed for this check. Run the backend test
-commands in [Testing and verified results](#testing-and-verified-results) from
-the activated backend environment. They verify authentication, quiz generation
-with simulated providers, CRUD, progress, and replay without a browser or keys.
-
-For manual API use, use a cookie-aware HTTP client: fetch `/api/csrf/`, retain its
-cookie, and send the returned token as `X-CSRFToken` on writes. Register, log in,
-fetch a fresh CSRF token after login, then use the documented quiz routes. JWTs
-remain in the client's cookie jar. See [API documentation](#api-documentation)
-for exact request bodies, responses, and permissions.
-
-Submitting a YouTube URL makes a real Gemini request. Before doing so, check
-[current pricing](https://ai.google.dev/gemini-api/docs/pricing) and your
-[project limits](https://ai.google.dev/gemini-api/docs/rate-limits).
-There is no automatic Gemini retry, continuation, or model fallback.
-
-### Optional browser integration
-
-This is outside the required backend setup and submission. The recorded browser
-tests used the locally adapted Developer Akademie frontend described in
-[Frontend repository and integration](#frontend-repository-and-integration).
-No changes to or publication of that frontend are required by this review.
-
-For an existing adapted copy, its API base URL is
-`http://127.0.0.1:8000/api/` (including the trailing slash). Serve it separately:
-
-```powershell
-cd ..\Quizly-Frontend
-python -m http.server 5500 --bind 127.0.0.1
-```
-
-Open [the local frontend](http://127.0.0.1:5500/). Use `127.0.0.1` consistently
-for both projects. The backend environment template already permits this local
-origin for credentialed CORS and CSRF. Do not open HTML with `file://`.
-
-The recorded walkthrough covered registration, login, generating a ten-question
-quiz, autosave, reload, changing answers, percentage results, and replay. It is
-integration evidence for the backend REST API, not a frontend deliverable.
-
-### Linux and macOS
-
-These are equivalent instructions, not a separately verified installation:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
-test -f .env || cp .env.example .env
-```
-
-Generate the signing key and edit `.env` as above. On Ubuntu/Debian, install audio
-tools with `sudo apt update && sudo apt install ffmpeg`; on macOS with Homebrew,
-use `brew install ffmpeg`. Verify both executables, then use the same migration
-and backend-server commands. The frontend remains optional.
-
-## Environment variables
-
-Django loads `.env` beside `manage.py` using python-dotenv. Exported process
-variables take precedence. Use `true`/`false` for booleans and comma-separated
-lists without spaces. Allowed hosts contain hostnames only; CORS and CSRF origins
-include scheme and port.
-
-| Variable | Required? | Default without `.env` | Local example / purpose |
-| --- | --- | --- | --- |
-| `DJANGO_SECRET_KEY` | Always | None; missing/insecure-prefix values prevent startup | Generate privately in step 5; signs sessions and JWTs |
-| `DJANGO_DEBUG` | Optional | `false` | `true` for local development only |
-| `DJANGO_ALLOWED_HOSTS` | Optional; configure for hosting | `localhost,127.0.0.1` | Hostnames accepted by Django |
-| `COOKIE_SECURE` | Optional | `true` | `false` only for local HTTP; affects JWT, session, and CSRF cookies |
-| `COOKIE_SAMESITE` | Optional | `Lax` | `Lax` for the same-site local setup |
-| `SECURE_SSL_REDIRECT` | Optional | `true` | `false` only for local HTTP |
-| `CSRF_TRUSTED_ORIGINS` | Needed for cross-origin browser writes | Empty | `http://127.0.0.1:5500`; template also allows localhost |
-| `CORS_ALLOWED_ORIGINS` | Needed for a separate browser origin | Empty | `http://127.0.0.1:5500`; template also allows localhost |
-| `GEMINI_API_KEY` | Automatic generation only | Empty | Set your key privately; never publish it |
-| `GEMINI_MODEL` | Optional | `gemini-3.8-flash` | Must support the configured thinking and structured output |
-| `GEMINI_TIMEOUT_SECONDS` | Optional | `180` | Positive requested server deadline; HTTPX gets ten extra seconds |
-| `GEMINI_MAX_OUTPUT_TOKENS` | Optional | `8192` | Positive output cap including thinking tokens |
-| `WHISPER_MODEL` | Optional | `small` | Local model; weights download on first use |
-| `WHISPER_DEVICE` | Optional | `auto` | `auto`, `cpu`, or `cuda`; automatic CPU fallback |
-| `WHISPER_CACHE_DIR` | Optional | Backend `.cache/whisper` | Directory for reusable model weights |
-| `FFMPEG_LOCATION` | Optional if tools are on `PATH` | Empty | Directory containing FFmpeg and FFprobe |
-
-The template's local HTTP settings deliberately differ from secure application
-defaults. `.env`, SQLite, model weights, and integration artifacts are ignored by
-Git. The transcription code does not consume `OPENAI_API_KEY`.
+Set `WHISPER_DEVICE=cuda` only after the check returns `True`, or keep `auto`.
+Installing a CUDA toolkit alone does not enable CUDA in CPU-only PyTorch.
 
 ## API documentation
 
@@ -433,6 +190,20 @@ valid CSRF protection. Refresh and logout work after access-token expiry.
 
 ### CSRF and browser requests
 
+The unchanged academy frontend does not bootstrap CSRF or send `X-CSRFToken`.
+The local template enables `LOCAL_FRONTEND_CSRF_COMPATIBILITY`: API writes without
+a token are accepted only from an exact loopback origin listed in **both**
+CORS and CSRF allowlists, with DEBUG enabled and an HTTP loopback API host.
+Nonempty bodies must be JSON; nonempty forms, missing/null/foreign origins,
+and invalid supplied CSRF tokens remain rejected. This applies to registration,
+login, refresh, logout, and authenticated quiz writes. JWT authentication and
+ownership checks still apply. Django admin keeps normal CSRF enforcement.
+
+Empty request bodies are supported for refresh and logout. The compatibility
+option defaults to false and cannot authorize requests when
+DEBUG is false, HTTPS is used, or secure cookies are enabled. Production clients
+must use the token flow below. Do not use the local template for deployment.
+
 `GET /api/csrf/` has no body and returns HTTP 200:
 
 ```json
@@ -458,7 +229,7 @@ const response = await fetch(`${api}login/`, {
 
 All example identities and passwords are fictional; use your own registered
 credentials. Login rotates the CSRF secret: obtain a fresh token after login,
-or before every subsequent unsafe request, as the integrated frontend does.
+or before every subsequent unsafe request.
 Never read JWTs from JavaScript or store them in localStorage.
 
 ### Registration, login, refresh, and logout
@@ -698,210 +469,73 @@ errors use `detail`, for example:
 Credentials and raw provider errors are not returned to clients. The application
 throttles are not guarantees of Gemini quota or availability.
 
-## Authentication and security
+## Development and Testing
 
-- Access tokens last 15 minutes, refresh tokens seven days. Both cookies are
-  HTTP-only, scoped to `/api/`, with configured Secure/SameSite flags.
-- Refresh blacklists the old refresh token and issues a new pair. Access tokens
-  contain a session reference checked against that blacklist, so revoking a valid
-  session also invalidates its associated access token.
-- Logout works after access expiry using the refresh cookie and CSRF. Rotation
-  and revocation affect that session, not every login for the user.
-- CSRF protection applies to public authentication writes and protected writes.
-  The readable CSRF cookie is **not** a JWT.
-- CORS allows credentials only for explicit frontend origins. Configure both
-  CORS and CSRF; they serve different purposes.
-- Users see only their own quiz lists; object permissions protect detail,
-  progress, and replay operations. Admin access is separate.
-- Django hashes passwords. Signing keys and API credentials come from the
-  environment; real secrets do not belong in source control or screenshots.
-
-## Django administration
-
-Create a superuser, then log in at `/admin/`. Admin uses Django session
-authentication rather than the REST API JWT cookies.
-
-Administrators can search/filter quizzes, edit title/description, delete complete
-quizzes, and open individual questions to edit text, options, and correct answers.
-Admin validation preserves four distinct choices and one solution. Individual
-questions cannot be added or deleted through admin; create complete quizzes
-through the validated API. Administrators can manage users and view all owners'
-quizzes.
-
-## Testing and verified results
-
-Run from the backend virtual environment:
+`requirements.txt` contains runtime dependencies and is sufficient to run Quizly.
+`requirements-dev.txt` includes that file plus Ruff. Install it only for development:
 
 ```powershell
+python -m pip install -r requirements-dev.txt
 python manage.py test --settings=quizly.test_settings
 python manage.py makemigrations --check --dry-run --settings=quizly.test_settings
-python -m ruff check .
-python -m ruff format --check .
+python -m ruff check apps quizly scripts manage.py
+python -m ruff format --check apps quizly scripts manage.py
 python scripts/check_quality.py
 python -m pip check
+python manage.py check
 ```
 
-Test settings provide an isolated signing key, disable HTTPS redirection, and use
-a fast test-only password hasher. Never use `quizly.test_settings` for development
-or deployment. Tests create a separate test database and simulate providers;
-they do not make paid generation requests.
+Tests use an isolated database and simulated AI providers, with no API key or
+model download required. Test settings are for tests only. The custom quality
+check requires documented snake_case functions of at most 14 lines.
 
-The AST check enforces snake_case, docstrings, and at most 14 physical lines per
-Python function, including tests. Coverage includes exact API contracts, cookies,
-CSRF, permissions, CRUD, date filters, progress, replay, admin, migration
-preservation, cleanup, and provider failures. Offline SDK tests check thinking,
-schema, deadlines, and single-request behavior for errors, redirects, truncated
-output, and continuation responses.
-
-For optional reproduction of the earlier frontend tests, in the **separate
-locally adapted frontend folder**, run:
-
-```powershell
-node --test tests/progress.test.cjs
-node --check shared/js/auth.js
-node --check shared/js/quiz.js
-node --check shared/js/progress.js
-```
-
-These nine tests use Node.js built-ins; no npm packages are required. The test
-file and progress controller are local integration additions, not guaranteed
-contents of a fresh official clone. They are external integration evidence, not
-required backend submission checks. Node.js is only needed for these tests.
-
-Latest confirmed local results, **15 October 2026**:
-
-| Check | Confirmed result |
-| --- | --- |
-| Backend suite | 102 tests passed again during the backend submission review |
-| Independent backend setup | Fresh isolated database migrated; CSRF, registration, login and own-quiz listing passed without frontend or Gemini key |
-| Locally adapted frontend suite (external evidence) | 9 tests passed in the earlier integration run |
-| Audio pipeline | Real YouTube download, FFmpeg conversion, and local CUDA Whisper verified |
-| Optimized Gemini | One authorized real call: HTTP 200 in 13.460 seconds, finish reason STOP |
-| Content | Ten valid questions, forty options, one correct solution per question |
-| Persistence/API | SQLite verified; POST 201 and GET 200 with exact response fields |
-| Real Edge browser | Quiz completed at 100%; autosave, reload, answer changes, and replay passed |
-
-The final Gemini test reused the previously recorded 3834-character transcript
-instead of downloading and transcribing again. Audio processing was verified in
-earlier real runs. Temporary test accounts and quizzes were removed afterward.
-See the integration report for the full evidence and scope. No live Gemini call
-is required to run the automated tests.
-
-Optional offline diagnostic:
-
-```powershell
-python scripts/prepare_gemini_test.py
-```
-
-It requires `.cache/flash38-transcript.txt` from the recorded integration run.
-This ignored file is **not included in a fresh clone**. When present, the script
-uses a dummy key and MockTransport to write an offline request manifest. It has
-no live mode and is not a required installation step.
-
-## Troubleshooting
-
-| Problem | What to check |
-| --- | --- |
-| FFmpeg or FFprobe not found | Install both executables, reopen the terminal, verify both version commands, and set `FFMPEG_LOCATION` if needed. |
-| CUDA unavailable | Run the PyTorch diagnostic; check the NVIDIA driver and CUDA-enabled wheel. Use `WHISPER_DEVICE=cpu` when needed. Forcing cuda does not install GPU support. |
-| Whisper loads slowly | First use downloads weights and loads the model; later calls reuse it per process. CPU use and restarts can increase latency. Check disk/network access and the cache. |
-| Gemini key appears empty | Use exactly `GEMINI_API_KEY` in backend `.env`. Check the boolean-only diagnostic, process overrides, and restart Django. Never print the key. |
-| Gemini 404 | Check model and project access against [model availability](https://ai.google.dev/gemini-api/docs/deprecations). Listing a model does not prove generation access; the older 2.5 model failed in this environment. Do not silently switch to a paid model. |
-| Gemini 504 or long generation | Check LOW thinking, output cap, requested server deadline, and provider status. Defaults are 180 seconds with 190-second HTTPX phase limits. The optimized run succeeded, but future capacity/deadline failures remain possible. Avoid unapproved retries. |
-| CSRF failure | Fetch `/api/csrf/` with credentials, send `X-CSRFToken`, refresh it after login, and configure `CSRF_TRUSTED_ORIGINS`. Unadapted upstream frontend code lacks the local CSRF integration. |
-| CORS error | Match the exact frontend scheme/host/port in `CORS_ALLOWED_ORIGINS`, include credentials, and avoid wildcard origins. |
-| Cookies not stored/sent | Include credentials, use one hostname, and check Secure/SameSite. Local HTTP needs the template's explicit exception. Cross-site HTTPS may need SameSite=None with Secure; browser third-party-cookie restrictions can still apply. |
-| YouTube download failure | Check public availability, age/region restrictions, duration, network, and yt-dlp version. See [yt-dlp dependencies](https://github.com/yt-dlp/yt-dlp#dependencies) for JavaScript-runtime requirements. Access restrictions are not bypassed. |
-| Frontend cannot reach backend | Check server availability, `/api/csrf/`, base URL/trailing slash, HTTP serving, and browser Network errors. A 404 for `/api/` alone does not mean Django is down. |
-| PowerShell activation blocked | Use the process-only execution-policy option or invoke the virtual environment's Python directly. |
-| Dependency installation fails | Check Python compatibility and PyTorch/Whisper wheel availability. The verified Windows runtime was Python 3.14.2; use the official PyTorch selector for your platform. |
-
-The frontend shows general generation errors. Investigate provider details through
-controlled diagnostics without exposing credentials. Free-model availability,
-project billing tier, and rate limits are separate checks.
+Security tests enforce CSRF checks and cover trusted local origins, rejected
+foreign origins and form bodies, invalid supplied tokens, production guards,
+admin protection, cookie authentication, token rotation, and logout revocation.
+Provider tests simulate external services; they do not validate a live Gemini
+project, YouTube availability, or real model inference.
 
 ## Security and deployment
 
-The supplied `.env.example` is for **local HTTP development**. Production hosting
-has not been completed or certified by local tests.
+Tokens remain in HTTP-only cookies and are never returned as JSON or accepted
+from Authorization headers. Refresh rotates and blacklists the previous session;
+logout revokes it. Quizzes require authentication and enforce ownership.
 
-For deployment, provide a private signing key, keep credentials outside Git, set
-`DJANGO_DEBUG=false`, `COOKIE_SECURE=true`, and `SECURE_SSL_REDIRECT=true`, and
-configure real allowed hosts and exact CORS/CSRF origins. Serve frontend and API
-through HTTPS. HSTS is enabled when DEBUG is false. Configure trusted proxy HTTPS
-handling for the actual host rather than trusting arbitrary forwarded headers.
+For production set `DJANGO_DEBUG=false`, `COOKIE_SECURE=true`,
+`SECURE_SSL_REDIRECT=true`, and `LOCAL_FRONTEND_CSRF_COMPATIBILITY=false`.
+Configure real hosts and exact HTTPS CORS/CSRF origins. Use a private signing key,
+a production WSGI/ASGI server, static-file hosting, and appropriate proxy settings.
+Django's development server is for local use. Check configuration with
+`python manage.py check --deploy` under the production environment.
+Back up the database and periodically run `python manage.py flushexpiredtokens`.
 
-Use a suitable WSGI/ASGI server and a web server for static assets. Django's
-development server and Python's static HTTP server are not production servers.
-No production server, queue, or hosting configuration is bundled. Allow adequate
-RAM/VRAM and disk space for Whisper and its weights; each worker process loads
-its own model. For concurrent production traffic, review SQLite locking, database
-choice, shared throttling cache, resource limits, and timeouts throughout the
-proxy/server chain.
+Use a newly generated private signing key; never reuse a publicly exposed or
+historical development key. Settings require an environment key and reject the
+`django-insecure-` prefix.
 
-Operational commands after deployment configuration:
+## Limitations and troubleshooting
 
-```bash
-python manage.py migrate
-python manage.py collectstatic --noinput
-python manage.py check --deploy
-python manage.py flushexpiredtokens
-```
+- Use `127.0.0.1:5500` with the original frontend's `127.0.0.1:8000` API target.
+  Mixing `localhost` and `127.0.0.1` breaks the same-site cookie workflow.
+- A 403 with `CSRF verification failed.` means the request failed the API's CSRF
+  checks. Verify `.env`, exact origins, and restart Django. Production clients
+  must bootstrap and send the token. A foreign quiz also returns 403.
+- The original frontend treats both 401 and 403 as session-refresh triggers and
+  has generic validation errors. Its quiz play does not use the backend's saved
+  progress/replay endpoints; those require a separately integrated client.
+- Generation is synchronous and can take time, especially on CPU. Gemini keys,
+  model access, billing and quotas, and YouTube availability are external
+  prerequisites. FFmpeg must be discoverable by the backend process.
+- The first Whisper use downloads weights. Temporary audio is cleaned up;
+  model weights remain cached. Each server process holds its own loaded model.
+- Verify cookies, CORS, and CSRF through the actual HTTPS deployment before
+  exposing it to users.
 
-Schedule `flushexpiredtokens` periodically. Back up data and preserve third-party
-licenses and attribution notices.
+## Credits
 
-The repository history contains one obsolete hardcoded Django development key.
-Current code loads a different private key from the environment and rejects the
-old insecure prefix. Any deployment still using the historical key must rotate
-it. The submission audit found no current configured credentials, databases,
-or generated integration artifacts in tracked files or inspected Git history.
-Git history was not rewritten.
+Created for Developer Akademie. The separate
+[official frontend](https://github.com/Developer-Akademie-Backendkurs/project.Quizly)
+retains its upstream license and attribution. Quizly uses Django, DRF, Simple JWT,
+Whisper, PyTorch, FFmpeg, yt-dlp, and the Google GenAI SDK under their licenses.
 
-To check secure settings locally, use a **separate activated PowerShell terminal**
-so these process overrides do not affect the HTTP development session:
-
-```powershell
-$env:DJANGO_DEBUG = "false"
-$env:COOKIE_SECURE = "true"
-$env:SECURE_SSL_REDIRECT = "true"
-python manage.py check --deploy
-```
-
-Close that terminal afterward. This uses the configured signing key and hosts;
-it does not prove a real HTTPS deployment works. Checks with local DEBUG/HTTP
-settings can correctly produce security warnings.
-
-## Additional documentation
-
-| Document | Contents |
-| --- | --- |
-| [Definition of Done](docs/definition-of-done.md) | Requirement-by-requirement status, API contract mapping, test evidence, and remaining deployment checks |
-| [Local integration report](docs/local-integration-check.md) | Environment checks, earlier failures, timeout optimization, and successful real Gemini/API/browser results with their scope |
-
-All submission documentation is in English. Local verification does not imply
-production acceptance or permanently unchanged external service quotas.
-
-The backend submission includes source code, migrations, requirements, the public
-configuration template, tests, and documentation. It excludes the supplied
-frontend, credentials, local databases, virtual environments, model weights,
-and test artifacts. Production hosting and an author-owned frontend repository
-are not prerequisites for this backend submission.
-
-## Credits and acknowledgements
-
-Developed as part of the **Developer Akademie GmbH training program**.
-
-- **Developer Akademie:** supplied the [official frontend](https://github.com/Developer-Akademie-Backendkurs/project.Quizly).
-  Its supplied components remain subject to the upstream
-  [non-commercial learning license](https://github.com/Developer-Akademie-Backendkurs/project.Quizly/blob/main/LICENSE.md).
-  Preserve the original license and attribution. The backend author does not
-  claim ownership of that repository or its assets.
-- **OpenAI and contributors:** [open-source Whisper](https://github.com/openai/whisper)
-  for local speech recognition.
-- **Google:** [Gemini API](https://ai.google.dev/gemini-api/docs) and the
-  [Google GenAI Python SDK](https://github.com/googleapis/python-genai).
-- **yt-dlp contributors:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) for extraction.
-- **FFmpeg contributors:** [FFmpeg](https://ffmpeg.org/) for conversion and probing.
-- The Django, DRF, Simple JWT, PyTorch, and other dependency communities for the
-  underlying tools. Their respective licenses apply.
+See also the [Definition of Done](docs/definition-of-done.md).

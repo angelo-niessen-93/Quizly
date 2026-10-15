@@ -152,6 +152,9 @@ CORS_ALLOWED_ORIGINS = list(
     filter(None, os.getenv('CORS_ALLOWED_ORIGINS', '').split(','))
 )
 CORS_ALLOW_CREDENTIALS = True
+LOCAL_FRONTEND_CSRF_COMPATIBILITY = (
+    os.getenv('LOCAL_FRONTEND_CSRF_COMPATIBILITY', 'false').lower() == 'true'
+)
 SECURE_SSL_REDIRECT = (
     os.getenv('SECURE_SSL_REDIRECT', 'true').lower() == 'true'
 )
