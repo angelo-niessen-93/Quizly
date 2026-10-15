@@ -83,10 +83,22 @@ def transcribe_audio(path):
     return text
 
 
+def gemini_http_options():
+    """Give the server a bounded deadline and HTTPX a transport margin."""
+    return {
+        'timeout': (settings.GEMINI_TIMEOUT_SECONDS + 10) * 1000,
+        'headers': {'X-Server-Timeout': str(settings.GEMINI_TIMEOUT_SECONDS)},
+        'retry_options': {'attempts': 1},
+        'client_args': {'follow_redirects': False},
+    }
+
+
 def generate_questions(transcript):
     """Ask Gemini Flash for schema-constrained quiz content."""
     with genai.Client(
-        api_key=settings.GEMINI_API_KEY, http_options={'timeout': 90000}
+        api_key=settings.GEMINI_API_KEY,
+        vertexai=False,
+        http_options=gemini_http_options(),
     ) as client:
         response = client.models.generate_content(
             model=settings.GEMINI_MODEL,

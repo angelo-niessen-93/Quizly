@@ -155,8 +155,79 @@ Prüfung ohne Schlüssel-Ausgabe oder API-Aufruf:
 python manage.py shell -c "from django.conf import settings; print('Gemini configured:', bool(settings.GEMINI_API_KEY.strip()))"
 ```
 
-Die lokale Konfiguration ist bereit. Gültigkeit, Konto-/Modellberechtigung und
-der vollständige Gemini-Aufruf wurden ohne Kostenfreigabe nicht online geprüft.
+Am 15.10.2026 wurde nach Bestätigung des Free Tier genau ein echter
+Generierungsaufruf mit `gemini-2.5-flash` ausgeführt. Audio und lokales Whisper
+funktionierten; Gemini antwortete mit 404, die Backend-API sicher mit 502.
+Google beschränkt die 2.5-Modelle inzwischen auf zuvor aktive Projekte.
+Ein erfolgreicher Metadatenzugriff bestätigt daher keine Generierungsberechtigung.
+
+Standard und lokale Modellkonfiguration verwenden `gemini-3.8-flash`.
+Der separat freigegebene einzelne Folgeversuch bestätigte generateContent über
+die Modell-Metadaten, scheiterte aber nach rund 90 Sekunden mit Provider-504
+`DEADLINE_EXCEEDED`: `Deadline expired before operation could complete.`
+Die Backend-API antwortete sicher mit 502; null Fragen wurden erzeugt.
+Audio und lokales Whisper funktionierten erneut. Ein erfolgreicher
+Generierungsnachweis samt Speicherung und Browser-Spiel bleibt offen.
+Der API-Key bleibt unverändert. Es gibt keine automatischen Generierungs-Retries
+oder Modell-Fallbacks. Free Tier muss zum Projekt gehören: Dieselbe Modell-ID
+kann in einem Paid-Tier-Projekt Kosten verursachen. Aktive RPM-/TPM-/RPD-Limits
+vor einem weiteren Test in Google AI Studio prüfen; hier waren ihre konkreten
+Werte nicht einsehbar. Das einmalige Testkontingent ist ausgeschöpft.
+
+### Lokale Optimierung des Gemini-504
+
+Die Optimierung wurde ausschließlich offline geprüft; es wurde kein weiterer
+Gemini-Aufruf ausgeführt. Modell und API-Verträge bleiben unverändert.
+
+- `thinking_level=low`, keine Thought-Ausgabe; zuvor galt der Modellstandard
+  medium. Kurze Aufgaben benötigen damit weniger Reasoning, ein Echtbeleg folgt.
+- Systemprompt von 310 auf 266 Zeichen gekürzt: ausschließlich Fakten aus dem
+  Transkript, kurze Texte, zehn Fragen, vier Optionen, eine korrekte Lösung,
+  keine Erklärungen. Das vorhandene JSON-Schema und die Inhaltsvalidierung bleiben.
+- `max_output_tokens=8192` statt eines nicht gesetzten Limits. Thinking-Tokens
+  zählen mit; bei `MAX_TOKENS` kann die Ausgabe unvollständig sein. Ungültiges
+  oder unvollständiges Quiz-JSON wird verworfen und nicht automatisch neu erzeugt.
+- Angeforderte Serverdeadline 180 Sekunden, HTTPX-Zeitlimits 190 Sekunden je
+  Netzwerkphase. Das SDK leitete zuvor aus 90000 ms auch `X-Server-Timeout: 90`
+  ab. Nun ist die Serverdeadline explizit, mit zehn Sekunden Transportreserve.
+  HTTPX-Phasenlimits sind keine garantierte Gesamtzeit für die gesamte Pipeline.
+- SDK `attempts=1`, HTTPX standardmäßig ohne Verbindungs-Retries, Redirects aus;
+  zusätzlich automatische Fortsetzungen und Function Calling ausdrücklich aus.
+  Kein Modell-Fallback; Developer API explizit gewählt, keine Vertex-Umleitung.
+
+Der bisherige 504 ist eine Serverantwort, kein nachgewiesener lokaler
+`ReadTimeout`. Die konfigurierte 90-Sekunden-Serverdeadline ist als Einfluss
+belegt. Ob Reasoning oder Dienstlast die Überschreitung verursachten, bleibt
+offen. Das Transkript mit 3834 Zeichen ist kein Beleg für einen zu großen Prompt.
+
+Den nächsten Request mit dem gespeicherten Transkript **ohne Netzwerkzugriff**
+vorbereiten:
+
+```powershell
+python scripts/prepare_gemini_test.py
+```
+
+Das Skript verwendet einen Dummy-Key und ausschließlich HTTPX MockTransport.
+Es schreibt `.cache/gemini-next-request.json` mit dem tatsächlich vom SDK
+serialisierten Body, den Zeitlimits und dem Transkript-Hash. Der Body enthält
+das vollständige Transkript; `.cache/` bleibt von Git ausgeschlossen.
+Es gibt keinen Live-Modus. Die neun neuen Transporttests benötigen diesen
+lokalen Cache nicht. Der installierte und geprüfte SDK-Stand ist google-genai
+2.31.0; die Mindestversion ist wegen der verwendeten Steueroptionen 2.31.
+
+Ein weiterer einzelner Echtversuch erfolgt erst nach gesonderter Freigabe:
+gespeichertes Transkript direkt verwenden, genau einen Request beobachten,
+bei Erfolg zehn Fragen und vier Antworten validieren, mit den vorhandenen
+Services speichern, per API abrufen und im getrennten Frontend spielen.
+Bei Fehler Code und bereinigte Meldung erfassen und ohne Wiederholung stoppen.
+
+Quellen: [Thinking und Tokenlimit](https://ai.google.dev/gemini-api/docs/generate-content/thinking),
+[Google-SDK](https://github.com/googleapis/python-genai),
+[Structured Outputs](https://ai.google.dev/gemini-api/docs/structured-output).
+
+Quellen: [Google-Modellverfügbarkeit](https://ai.google.dev/gemini-api/docs/deprecations),
+[Preise](https://ai.google.dev/gemini-api/docs/pricing),
+[Projektlimits](https://ai.google.dev/gemini-api/docs/rate-limits).
 
 ## Umgebungsvariablen
 
@@ -174,7 +245,9 @@ Die Datei ist von Git ausgeschlossen. `.env.example` enthält keine Zugangsdaten
 | `CSRF_TRUSTED_ORIGINS` | Explizite Frontend-Ursprünge mit Schema und Port; standardmäßig leer |
 | `CORS_ALLOWED_ORIGINS` | Explizite Frontend-Ursprünge; standardmäßig leer |
 | `GEMINI_API_KEY` | Eigener Gemini-API-Key; standardmäßig leer |
-| `GEMINI_MODEL` | `gemini-2.5-flash`; verfügbares Flash-Modell im eigenen Konto prüfen |
+| `GEMINI_MODEL` | `gemini-3.8-flash`; Tarif im eigenen Projekt prüfen; einmaliger Echtversuch lieferte Provider-504, erfolgreicher Abschluss noch offen |
+| `GEMINI_TIMEOUT_SECONDS` | `180`, positive angeforderte Serverdeadline; HTTPX erhält zehn Sekunden zusätzliche Reserve |
+| `GEMINI_MAX_OUTPUT_TOKENS` | `8192`, positive Tokenobergrenze einschließlich Thinking; unvollständige Inhalte werden verworfen |
 | `WHISPER_MODEL` | `small`, lokales Whisper-Modell |
 | `WHISPER_DEVICE` | `auto`, alternativ `cuda` oder `cpu` |
 | `WHISPER_CACHE_DIR` | Optionaler Cache-Ordner; Standard `.cache/whisper` |
@@ -488,7 +561,7 @@ vorgesehenen Schlüssel und einen schnellen Passwort-Hasher.
 `quizly.test_settings` niemals für Entwicklung oder Produktion verwenden.
 Externe Dienste sind in Tests simuliert; es werden keine echten Kosten erzeugt.
 
-Die 91 automatisierten Backend-Tests decken Registrierung, doppelte E-Mails, Passwortvalidierung,
+Die 102 automatisierten Backend-Tests decken Registrierung, doppelte E-Mails, Passwortvalidierung,
 Cookie-Flags, Login, Token-Rotation, Logout/Blacklist, CSRF, Berechtigungen,
 CRUD, Datumsauswahl, Fortschritt, Antwortänderung, Bewertung, Wiederholung,
 Admin-Bearbeitung, URL-Validierung, KI-Schema, Rollback und Dateibereinigung ab.
@@ -525,7 +598,10 @@ Entwicklungsserver ist kein Produktionsserver.
 
 Die vollständige Zuordnung aller DoD-Punkte mit offenen externen Prüfungen steht
 in [docs/definition-of-done.md](docs/definition-of-done.md).
-Der echte YouTube -> FFmpeg -> Whisper -> Gemini-Durchlauf bleibt offen.
+Der echte YouTube -> FFmpeg -> Whisper -> Gemini-Durchlauf wurde gestartet,
+scheiterte beim alten Modell mit 404 und im freigegebenen einzelnen Folgeversuch
+mit 3.8 Flash an Provider-504 DEADLINE_EXCEEDED; null Fragen wurden erzeugt.
+Die erfolgreiche vollständige Generierung bleibt offen.
 Das offizielle Frontend liegt separat in D:\DEVAkademie\Projekte\Quizly-Frontend
 und wurde gemeinsam mit diesem Backend lokal im Browser geprüft.
 Das Frontend synchronisiert Antworten, Wiederaufnahme und Replay jetzt mit dem Backend.
@@ -558,8 +634,10 @@ Ergebnissen, Secret-Status ohne Werte und allen Blockern findest du in
 [docs/local-integration-check.md](docs/local-integration-check.md).
 
 Der echte YouTube-Audiodownload, FFmpeg, FFprobe und lokales GPU-Whisper sind
-geprüft. Gemini ist lokal konfiguriert; ein echter Generierungsaufruf wartet
-auf ausdrückliche Kostenfreigabe. Keine kostenpflichtigen APIs wurden aufgerufen.
+geprüft. Der erste Free-Tier-Versuch lieferte Gemini 404; der separat freigegebene
+einzelne Folgeversuch mit 3.8 Flash scheiterte mit 504 DEADLINE_EXCEEDED.
+Der nächste Durchlauf benötigt eine neue Freigabe für einen weiteren Versuch;
+es erfolgten keine kostenpflichtigen Aufrufe und kein automatischer Retry.
 Die manuelle Quiz-Erstellung und Speicherung sowie die Frontend-Synchronisierung
 von Auswahlen, Reload, Antwortänderung und Replay wurden real geprüft.
 

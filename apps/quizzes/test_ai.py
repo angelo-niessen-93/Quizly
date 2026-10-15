@@ -3,8 +3,9 @@
 import json
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+import httpx
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, override_settings
 from rest_framework.exceptions import ValidationError
@@ -155,7 +156,7 @@ class AIServiceTests(SimpleTestCase):
             self.assertEqual(ai.transcribe_audio(path), 'Transcript')
             run.assert_called_once_with(path)
 
-    @override_settings(GEMINI_API_KEY='test', GEMINI_MODEL='gemini-2.5-flash')
+    @override_settings(GEMINI_API_KEY='test', GEMINI_MODEL='gemini-3.8-flash')
     def test_gemini_receives_schema_and_validates_output(self):
         """The configured Flash model receives the schema and transcript."""
         with patch.object(ai.genai, 'Client') as sdk:
@@ -167,15 +168,36 @@ class AIServiceTests(SimpleTestCase):
                 ai.generate_questions('Transcript'), quiz_content()
             )
             self.check_gemini_arguments(client)
+            options = sdk.call_args.kwargs['http_options']
+            self.assertEqual(options['retry_options']['attempts'], 1)
 
     def check_gemini_arguments(self, client):
         """Check the provider request independently of output parsing."""
         args = client.models.generate_content.call_args.kwargs
-        self.assertEqual(args['model'], 'gemini-2.5-flash')
+        self.assertEqual(args['model'], 'gemini-3.8-flash')
         self.assertEqual(args['contents'], 'Transcript')
         self.assertEqual(
             args['config']['response_mime_type'], 'application/json'
         )
+
+    def offline_gemini_client(self, **kwargs):
+        """Run the real SDK against an in-memory HTTP error transport."""
+        kwargs['http_options']['client_args'] = {
+            'transport': httpx.MockTransport(self.provider_request)
+        }
+        return self.sdk_class(**kwargs)
+
+    @override_settings(GEMINI_API_KEY='test')
+    def test_transient_gemini_failure_is_not_retried(self):
+        """One generation cannot silently issue extra provider requests."""
+        self.sdk_class = ai.genai.Client
+        self.provider_request = Mock(return_value=httpx.Response(503))
+        with patch.object(
+            ai.genai, 'Client', side_effect=self.offline_gemini_client
+        ):
+            with self.assertRaises(ai.GeminiError):
+                ai.generate_questions('Transcript')
+        self.provider_request.assert_called_once()
 
 
 class GenerationAPITests(APITestCase):
@@ -227,6 +249,21 @@ class GenerationAPITests(APITestCase):
         ):
             response = self.client.post('/api/quizzes/', {'url': URL})
         self.assertEqual(response.status_code, 502)
+        self.assertFalse(Quiz.objects.exists())
+
+    def test_provider_deadline_returns_safe_502(self):
+        """Provider 504 details stay private and no partial quiz is saved."""
+        error = ai.GeminiError(504, {'message': 'Private deadline details'})
+        with patch.multiple(
+            ai,
+            require_configuration=Mock(),
+            download_audio=Mock(return_value='audio.mp3'),
+            transcribe_audio=Mock(return_value='Transcript'),
+            generate_questions=Mock(side_effect=error),
+        ):
+            response = self.client.post('/api/quizzes/', {'url': URL})
+        self.assertEqual(response.status_code, 502)
+        self.assertNotIn('Private', str(response.data))
         self.assertFalse(Quiz.objects.exists())
 
     def test_database_failure_rolls_back_content(self):

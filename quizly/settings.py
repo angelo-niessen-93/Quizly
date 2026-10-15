@@ -162,7 +162,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.8-flash')
+GEMINI_TIMEOUT_SECONDS = int(os.getenv('GEMINI_TIMEOUT_SECONDS', '180'))
+GEMINI_MAX_OUTPUT_TOKENS = int(os.getenv('GEMINI_MAX_OUTPUT_TOKENS', '8192'))
 FFMPEG_LOCATION = os.getenv('FFMPEG_LOCATION', '')
 if FFMPEG_LOCATION and FFMPEG_LOCATION not in os.get_exec_path():
     os.environ['PATH'] = (
